@@ -1,0 +1,515 @@
+{% assign block_id = block.id | downcase | replace: '_', '-' %}
+
+{{ 'component-b2b-quick-order.css' | asset_url | stylesheet_tag }}
+
+<style>
+  .b2b-quick-order-{{ block_id }} {
+    --b2b-qo-border-radius: {{ block.settings.border_radius }}px;
+    --b2b-qo-border-width: {% if block.settings.show_border %}{{ block.settings.border_thickness }}px{% else %}0px{% endif %};
+    --b2b-qo-header-margin-bottom: {{ block.settings.header_margin_bottom }}px;
+    --b2b-qo-variant-spacing: {{ block.settings.variant_spacing }}px;
+    --b2b-qo-add-to-cart-padding-top: {{ block.settings.add_to_cart_padding_top }}px;
+    --b2b-qo-add-to-cart-border: {% if block.settings.show_add_to_cart_border %}1px solid var(--b2b-qo-separator-color, #eeeeee){% else %}none{% endif %};
+    --b2b-qo-header-alignment: {{ block.settings.header_alignment }};
+    --b2b-qo-separator-style: {% if block.settings.variant_separator == 'line' %}1px solid {{ block.settings.separator_color }}{% elsif block.settings.variant_separator == 'thick_line' %}2px solid {{ block.settings.separator_color }}{% elsif block.settings.variant_separator == 'dotted_line' %}1px dotted {{ block.settings.separator_color }}{% elsif block.settings.variant_separator == 'dashed_line' %}1px dashed {{ block.settings.separator_color }}{% else %}none{% endif %};
+    --b2b-qo-separator-color: {{ block.settings.separator_color }};
+    --b2b-qo-unlimited-inventory-color: {{ block.settings.unlimited_inventory_color }};
+    --b2b-qo-low-inventory-color: {{ block.settings.low_inventory_color }};
+    --b2b-qo-out-of-stock-color: {{ block.settings.out_of_stock_color }};
+    --b2b-qo-increment-button-text-size: {{ block.settings.increment_button_text_size }}px;
+    --b2b-qo-rectangle-button-radius: {{ block.settings.rectangle_button_radius }}px;
+    --b2b-qo-cart-button-alignment: {{ block.settings.cart_button_alignment }};
+  }
+
+  {% case block.settings.block_padding %}
+    {% when 'none' %}
+      {% assign horizontal_padding = '0px 0px' %}
+    {% when 'left' %}
+      {% assign horizontal_padding = '0px 24px' %}
+    {% when 'right' %}
+      {% assign horizontal_padding = '24px 0px' %}
+    {% else %}
+      {% assign horizontal_padding = '24px 24px' %}
+  {% endcase %}
+
+  {% case block.settings.block_padding_vertical %}
+    {% when 'none' %}
+      {% assign vertical_padding = '0px 0px' %}
+    {% when 'top' %}
+      {% assign vertical_padding = '24px 0px' %}
+    {% when 'bottom' %}
+      {% assign vertical_padding = '0px 24px' %}
+    {% else %}
+      {% assign vertical_padding = '24px 24px' %}
+  {% endcase %}
+
+  .b2b-quick-order-{{ block_id }} {
+    --b2b-qo-block-padding: {{ vertical_padding | split: ' ' | first }} {{ horizontal_padding | split: ' ' | last }} {{ vertical_padding | split: ' ' | last }} {{ horizontal_padding | split: ' ' | first }};
+  }
+
+  {% if block.settings.color_scheme == 'none' %}
+    .b2b-quick-order-{{ block_id }} {
+      --b2b-qo-background-color: {{ block.settings.background_color }};
+      --b2b-qo-border-color: {{ block.settings.border_color }};
+      --b2b-qo-text-color: {{ block.settings.text_color }};
+      --b2b-qo-input-border-color: {{ block.settings.input_border_color }};
+      --b2b-qo-input-background-color: {{ block.settings.input_background_color }};
+      --b2b-qo-increment-button-color: {{ block.settings.increment_button_color }};
+      --b2b-qo-increment-button-text-color: {{ block.settings.increment_button_text_color }};
+      --b2b-qo-increment-button-hover-color: {{ block.settings.increment_button_hover_color }};
+      --b2b-qo-cart-button-color: {{ block.settings.cart_button_color }};
+      --b2b-qo-cart-button-text-color: {{ block.settings.cart_button_text_color }};
+      --b2b-qo-cart-button-hover-color: {{ block.settings.cart_button_hover_color }};
+    }
+  {% else %}
+    .b2b-quick-order-{{ block_id }} {
+      --b2b-qo-background-color: var(--{{ block.settings.color_scheme }}-background);
+      --b2b-qo-border-color: var(--{{ block.settings.color_scheme }}-color);
+      --b2b-qo-text-color: var(--{{ block.settings.color_scheme }}-color);
+      --b2b-qo-input-border-color: var(--{{ block.settings.color_scheme }}-color);
+      --b2b-qo-input-background-color: var(--{{ block.settings.color_scheme }}-background);
+      --b2b-qo-increment-button-color: var(--{{ block.settings.color_scheme }}-color);
+      --b2b-qo-increment-button-text-color: var(--{{ block.settings.color_scheme }}-background);
+      --b2b-qo-increment-button-hover-color: var(--{{ block.settings.color_scheme }}-color, #000000);
+      --b2b-qo-cart-button-color: var(--{{ block.settings.color_scheme }}-color);
+      --b2b-qo-cart-button-text-color: var(--{{ block.settings.color_scheme }}-background);
+      --b2b-qo-cart-button-hover-color: var(--{{ block.settings.color_scheme }}-color, #000000);
+    }
+  {% endif %}
+  {% if block.settings.variant_separator == 'spacer' %}
+  .b2b-quick-order-{{ block_id }} .b2b-quick-order__variant:not(:last-child) {
+    margin-bottom: {{ block.settings.spacer_height }}px;
+  }
+  {% endif %}
+</style>
+<b2b-quick-order class="b2b-quick-order b2b-quick-order-{{ block_id }}" {{ block.shopify_attributes }}>
+  <div class="b2b-quick-order__header">
+    {% if block.settings.title != blank %}
+      <h3 class="b2b-quick-order__title">{{ block.settings.title }}</h3>
+    {% endif %}
+    {% if block.settings.description != blank %}
+      <p class="b2b-quick-order__description">{{ block.settings.description }}</p>
+    {% endif %}
+  </div>
+
+  <div class="b2b-quick-order__variants">
+    {% for variant in product.variants %}
+      <div class="b2b-quick-order__variant" data-variant-id="{{ variant.id }}">
+        <div class="b2b-quick-order__variant-info">
+          <div class="b2b-quick-order__variant-info-content">
+            <h4 class="b2b-quick-order__variant-title">
+              {% if variant.title == 'Default Title' or product.variants.size == 1 %}
+                {{ product.title }} :
+              {% else %}
+                {{ variant.title }} :
+              {% endif %}
+            </h4>
+            <div
+              class="b2b-quick-order__variant-price{% if variant.compare_at_price and variant.compare_at_price > variant.price %} b2b-quick-order__variant-price--sale{% endif %}"
+            >
+              {% if variant.compare_at_price and variant.compare_at_price > variant.price %}
+                <div class="b2b-quick-order__variant-price-current">
+                  {{ variant.price | money }}
+                </div>
+                <div class="b2b-quick-order__variant-price-compare">
+                  {{ variant.compare_at_price | money }}
+                </div>
+              {% else %}
+                {{ variant.price | money }}
+              {% endif %}
+            </div>
+          </div>
+          {% if block.settings.show_inventory %}
+            {% if variant.inventory_management %}
+              {% if variant.inventory_quantity > 0 %}
+                {% if variant.inventory_quantity <= block.settings.low_inventory_threshold %}
+                  <p class="b2b-quick-order__variant-inventory b2b-quick-order__variant-inventory--low">
+                    {{ variant.inventory_quantity }} disponible(s) / available
+                  </p>
+                {% else %}
+                  <p class="b2b-quick-order__variant-inventory">
+                    {{ variant.inventory_quantity }} disponible(s) / available
+                  </p>
+                {% endif %}
+              {% else %}
+                <p class="b2b-quick-order__variant-inventory b2b-quick-order__variant-inventory--out">
+                  Épuisé / Out of stock
+                </p>
+              {% endif %}
+            {% else %}
+              <p class="b2b-quick-order__variant-inventory b2b-quick-order__variant-inventory--unlimited">
+                Inventaire illimité / Unlimited inventory
+              </p>
+            {% endif %}
+          {% endif %}
+        </div>
+
+        <div class="b2b-quick-order__quantity-controls">
+          <button
+            type="button"
+            class="b2b-quick-order__reset-btn"
+            data-action="reset"
+            data-variant-id="{{ variant.id }}"
+            aria-label="Reset quantity"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3,6 5,6 21,6"></polyline>
+              <path d="m19,6v14a2,2 0 0,1 -2,2H7a2,2 0 0,1 -2,-2V6m3,0V4a2,2 0 0,1 2,-2h4a2,2 0 0,1 2,2v2"></path>
+              <line x1="10" y1="11" x2="10" y2="17"></line>
+              <line x1="14" y1="11" x2="14" y2="17"></line>
+            </svg>
+          </button>
+
+          <input
+            type="number"
+            class="b2b-quick-order__quantity-input"
+            data-variant-id="{{ variant.id }}"
+            data-price="{{ variant.price }}"
+            data-inventory="{{ variant.inventory_quantity }}"
+            data-tracks-inventory="{% if variant.inventory_management %}true{% else %}false{% endif %}"
+            value="0"
+            min="0"
+            max="9999"
+            {% if variant.inventory_management and variant.inventory_policy == 'deny' %}
+              max="{{ variant.inventory_quantity }}"
+            {% endif %}
+          >
+
+          <button
+            type="button"
+            class="b2b-quick-order__increment-btn b2b-quick-order__increment-btn--{{ block.settings.button_style }}"
+            data-action="increment"
+            data-variant-id="{{ variant.id }}"
+            data-amount="1"
+          >
+            +1
+          </button>
+
+          <button
+            type="button"
+            class="b2b-quick-order__increment-btn b2b-quick-order__increment-btn--{{ block.settings.button_style }}"
+            data-action="increment"
+            data-variant-id="{{ variant.id }}"
+            data-amount="10"
+          >
+            +10
+          </button>
+        </div>
+      </div>
+      {% if product.variants.size == 1 %}{% break %}{% endif %}
+    {% endfor %}
+  </div>
+
+  <div class="b2b-quick-order__add-to-cart">
+    <div
+      class="note note-success mt3 js-added-msg"
+      style="display: none"
+      role="alert"
+      aria-live="polite"
+    >
+      {{ 'products.product.success_note_html' | t: cart_url: routes.cart_url, all_products_collection_url: routes.all_products_collection_url }}
+    </div>
+
+    <div class="b2b-quick-order__error-msg" style="display: none" role="alert" aria-live="assertive">
+      <p class="note note-error">Failed to add items to cart. Please try again.</p>
+    </div>
+
+    <div class="b2b-quick-order__total">
+      <p class="b2b-quick-order__total-text">
+        Total: <span data-total-price aria-label="Order total">{{ 0 | money }}</span>
+      </p>
+    </div>
+
+    <button
+      type="button"
+      class="b2b-quick-order__cart-btn"
+      data-add-to-cart
+      disabled
+      aria-describedby="cart-total"
+    >
+      <span class="b2b-quick-order__cart-btn-text">{{ block.settings.add_to_cart_text }}</span>
+      <div class="b2b-quick-order__cart-btn-spinner" aria-hidden="true">
+        <div class="b2b-quick-order__spinner"></div>
+      </div>
+    </button>
+  </div>
+</b2b-quick-order>
+<script>
+(function() {
+  class B2BQuickOrder extends HTMLElement {
+    constructor() {
+      super();
+      this.quantities = new Map();
+      this.totalPrice = 0;
+      this.updateTimeout = null;
+      this.cachedElements = {};
+    }
+
+    connectedCallback() {
+      this.cacheElements();
+      this.setupEventListeners();
+      this.updateTotal();
+    }
+
+    disconnectedCallback() {
+      // Clear any pending timeouts
+      if (this.updateTimeout) {
+        clearTimeout(this.updateTimeout);
+        this.updateTimeout = null;
+      }
+
+      // Clear references to prevent memory leaks
+      this.quantities.clear();
+      this.cachedElements = {};
+
+      // Event listeners are automatically removed when element is disconnected
+    }
+
+    cacheElements() {
+      this.cachedElements = {
+        totalElement: this.querySelector('[data-total-price]'),
+        addToCartBtn: this.querySelector('[data-add-to-cart]'),
+        successMsg: this.querySelector('.js-added-msg'),
+        errorMsg: this.querySelector('.b2b-quick-order__error-msg'),
+        quantityInputs: this.querySelectorAll('.b2b-quick-order__quantity-input')
+      };
+    }
+
+    setupEventListeners() {
+      this.addEventListener('click', this.handleClick.bind(this));
+      this.addEventListener('input', this.handleInput.bind(this));
+      this.addEventListener('keydown', this.handleKeydown.bind(this));
+    }
+
+    handleKeydown(event) {
+      const target = event.target;
+
+      // Handle keyboard shortcuts within quantity inputs
+      if (target.classList.contains('b2b-quick-order__quantity-input')) {
+        const variantId = target.dataset.variantId;
+
+        switch (event.key) {
+          case 'ArrowUp':
+            event.preventDefault();
+            this.incrementQuantity(variantId, 1);
+            break;
+          case 'ArrowDown':
+            event.preventDefault();
+            if (parseInt(target.value) > 0) {
+              this.incrementQuantity(variantId, -1);
+            }
+            break;
+          case 'Escape':
+            event.preventDefault();
+            this.resetQuantity(variantId);
+            break;
+        }
+      }
+    }
+
+    handleClick(event) {
+      const button = event.target.closest('button');
+      if (!button) return;
+
+      const action = button.dataset.action;
+      const variantId = button.dataset.variantId;
+
+      if (action === 'increment') {
+        const amount = parseInt(button.dataset.amount);
+        this.incrementQuantity(variantId, amount);
+      } else if (action === 'reset') {
+        this.resetQuantity(variantId);
+      } else if (button.hasAttribute('data-add-to-cart')) {
+        this.addToCart();
+      }
+    }
+
+    handleInput(event) {
+      const input = event.target;
+      if (!input.classList.contains('b2b-quick-order__quantity-input')) return;
+
+      const variantId = input.dataset.variantId;
+      const quantity = parseInt(input.value) || 0;
+      const tracksInventory = input.dataset.tracksInventory === 'true';
+      const inventory = parseInt(input.dataset.inventory);
+
+      if (tracksInventory && quantity > inventory) {
+        input.value = inventory;
+        this.quantities.set(variantId, inventory);
+      } else {
+        this.quantities.set(variantId, Math.max(0, quantity));
+      }
+
+      this.updateTotal(); // Debounced by default
+    }
+
+    incrementQuantity(variantId, amount) {
+      const input = this.querySelector(`[data-variant-id="${variantId}"].b2b-quick-order__quantity-input`);
+      const currentQuantity = parseInt(input.value) || 0;
+      const tracksInventory = input.dataset.tracksInventory === 'true';
+      const inventory = parseInt(input.dataset.inventory);
+
+      let newQuantity = Math.max(0, currentQuantity + amount);
+
+      if (tracksInventory && newQuantity > inventory) {
+        newQuantity = inventory;
+      }
+
+      input.value = newQuantity;
+      this.quantities.set(variantId, newQuantity);
+      this.updateTotal(true); // Immediate update for button clicks
+    }
+
+    resetQuantity(variantId) {
+      const input = this.querySelector(`[data-variant-id="${variantId}"].b2b-quick-order__quantity-input`);
+      input.value = 0;
+      this.quantities.set(variantId, 0);
+      this.updateTotal(true); // Immediate update for button clicks
+    }
+
+    updateTotal(immediate = false) {
+      if (!immediate) {
+        // Debounce updates to avoid excessive calculations during rapid input changes
+        if (this.updateTimeout) clearTimeout(this.updateTimeout);
+        this.updateTimeout = setTimeout(() => this.updateTotal(true), 150);
+        return;
+      }
+
+      this.totalPrice = 0;
+      let hasItems = false;
+
+      this.cachedElements.quantityInputs.forEach(input => {
+        const quantity = parseInt(input.value) || 0;
+        const price = parseInt(input.dataset.price);
+
+        if (quantity > 0) {
+          hasItems = true;
+          this.totalPrice += quantity * price;
+        }
+      });
+
+      if (this.cachedElements.totalElement) {
+        this.cachedElements.totalElement.textContent = new Intl.NumberFormat('en-US', {
+          style: 'currency',
+          currency: Shopify.currency.active
+        }).format(this.totalPrice / 100);
+      }
+
+      if (this.cachedElements.addToCartBtn) {
+        this.cachedElements.addToCartBtn.disabled = !hasItems;
+      }
+    }
+
+    resetForm() {
+      this.cachedElements.quantityInputs.forEach(input => {
+        input.value = 0;
+      });
+      this.quantities.clear();
+      this.updateTotal(true);
+    }
+
+    async addToCart() {
+      const items = [];
+
+      // Hide messages initially
+      if (this.cachedElements.successMsg) {
+        this.cachedElements.successMsg.style.display = 'none';
+      }
+      if (this.cachedElements.errorMsg) {
+        this.cachedElements.errorMsg.style.display = 'none';
+      }
+
+      this.cachedElements.quantityInputs.forEach(input => {
+        const quantity = parseInt(input.value) || 0;
+        if (quantity > 0) {
+          items.push({
+            id: input.dataset.variantId,
+            quantity: quantity
+          });
+        }
+      });
+
+      if (items.length === 0) return;
+
+      const addToCartBtn = this.querySelector('[data-add-to-cart]');
+      
+      // Prevent double-click submissions
+      if (addToCartBtn.disabled || addToCartBtn.classList.contains('loading')) {
+        return;
+      }
+      
+      addToCartBtn.disabled = true;
+      addToCartBtn.classList.add('loading');
+
+      try {
+        const response = await fetch('/cart/add.js', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ items })
+        });
+
+        if (response.ok) {
+          // Use Shopify's built-in cart update mechanism for proper icon updates
+          let cartConfig = document.getElementById('cart-config');
+          if (cartConfig) {
+            cartConfig = JSON.parse(cartConfig.innerHTML || '{}');
+            Shopify.theme.cart.getCart().then(Cart => {
+              if (Shopify.theme.ajaxCart && Shopify.theme.ajaxCart.updateView) {
+                Shopify.theme.ajaxCart.updateView(cartConfig, Cart);
+              }
+              // Reset form after cart update
+              this.resetForm();
+            }).catch(error => {
+              console.error('Error updating cart view:', error);
+              // Fallback: just reset form
+              this.resetForm();
+            });
+          } else {
+            // Fallback: refresh cart manually and reset form
+            this.refreshCartIcon();
+            this.resetForm();
+          }
+
+          // Show success message
+          if (this.cachedElements.successMsg) {
+            this.cachedElements.successMsg.style.display = 'block';
+          }
+        } else {
+          console.error('Failed to add items to cart');
+          if (this.cachedElements.errorMsg) {
+            this.cachedElements.errorMsg.style.display = 'block';
+          }
+        }
+
+        addToCartBtn.disabled = false;
+        addToCartBtn.classList.remove('loading');
+      } catch (error) {
+        console.error('Error adding items to cart:', error);
+        if (this.cachedElements.errorMsg) {
+          this.cachedElements.errorMsg.style.display = 'block';
+        }
+        addToCartBtn.disabled = false;
+        addToCartBtn.classList.remove('loading');
+      }
+    }
+
+    refreshCartIcon() {
+      // Simplified cart refresh - rely on the cart:updated event
+      fetch('/cart.js')
+        .then(response => response.json())
+        .then(cart => {
+          document.dispatchEvent(new CustomEvent('cart:updated', {
+            detail: { cart: cart }
+          }));
+        })
+        .catch(error => {
+          console.error('Error refreshing cart:', error);
+        });
+    }
+  }
+
+  customElements.define('b2b-quick-order', B2BQuickOrder);
+})();
+</script>

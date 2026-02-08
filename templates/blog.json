@@ -1,0 +1,1 @@
+{"sections":{"banner":{"type":"banner-image","settings":{}},"breadcrumbs":{"type":"breadcrumbs","settings":{}},"main":{"type":"main-blog","blocks":{"sidebar":{"type":"sidebar","settings":{}}},"block_order":["sidebar"],"settings":{}},"newsletter":{"type":"newsletter","settings":{}}},"order":["banner","breadcrumbs","main","newsletter"]}

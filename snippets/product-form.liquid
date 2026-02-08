@@ -1,0 +1,267 @@
+{% comment %}
+snippets/product-form.liquid
+{% endcomment %}
+{%- liquid
+
+  if product.template_suffix == 'pre-order'
+    assign call_to_action = 'products.product.pre_order' | t
+  else
+    assign call_to_action = 'products.product.add_to_cart' | t
+  endif
+
+  unless current_variant.available
+    assign call_to_action = 'products.product.sold_out' | t
+  endunless
+
+  assign product_form_id = 'product-form-' | append: section.id
+
+-%}
+
+{%
+  form 'product',
+  product,
+  id: product_form_id,
+  class: "product_form",
+  data-product-form: product_form_config
+ %}
+
+  <!-- if quick view -->
+  {%- if template == 'product.quick' -%}
+
+    <!-- product title -->
+     <h3>
+       <a href="{{ product.url }}">{{ product.title }}</a>
+     </h3>
+
+     <!-- product price -->
+   <h4 class="h5">
+     {% render 'product-price', variant: current_variant, product: product %}
+   </h4>
+
+   <!-- spi banner -->
+   <!-- spi banner -->
+   <div class="spi-banner">
+     {{ form | payment_terms }}
+   </div><!-- /#spi-banner -->
+  {%- endif -%}
+
+
+  <!-- product variant -->
+  <!-- product variant -->
+  {%- unless product.has_only_default_variant -%}
+   {%- if settings.product_variants == 'swatches' -%}
+     <div
+      class="product__variants-swatches mt4 mb6 no-js-hidden"
+      data-section="{{ section.id }}"
+      data-url="{{ product.url }}">
+       {% for option in product.options_with_values %}
+         {% render "swatch",
+           option: option,
+           current_variant: current_variant,
+           product: product %}
+       {% endfor %}
+     </div>
+   {%- else -%}
+     <div
+      class="product__variants-select no-js-hidden"
+      data-section="{{ section.id }}"
+      data-url="{{ product.url }}">
+       {%- for option in product.options_with_values -%}
+         <div class="product-form__input product-form__input--dropdown">
+           <label
+            class="form__label"
+            for="Option-{{ section.id }}-{{ forloop.index0 }}">
+             {{ option.name }}
+           </label>
+           <div class="select">
+             <select
+               id="Option-{{ section.id }}-{{ forloop.index0 }}"
+               class="js-variant-selector styled-select"
+               name="options[{{ option.name | escape }}]"
+               form="product-form-{{ section.id }}"
+             >
+               {%- for value in option.values -%}
+                 <option
+                  value="{{ value | escape }}"
+                  {% if option.selected_value == value %}
+                  selected="selected"
+                  {% endif %}>
+                   {{ value }}
+                 </option>
+               {%- endfor -%}
+             </select>
+           </div>
+         </div>
+       {%- endfor -%}
+     </div>
+   {%- endif -%}
+  {%- endunless -%}
+
+  <noscript class="product__variants-select product-form__noscript-wrapper-{{ section.id }}">
+    <div class="product-form__input product-form__input--dropdown{% if product.has_only_default_variant %} hidden{% endif %}">
+      <label class="form__label" for="Variants-{{ section.id }}">{{ 'products.product.select_option' | t }}</label>
+      <div class="select">
+        <select name="id" id="Variants-{{ section.id }}">
+          {%- for variant in product.variants -%}
+            <option
+              {% if variant == product.selected_or_first_available_variant %}selected="selected"{% endif %}
+              {% if variant.available == false %}disabled{% endif %}
+              value="{{ variant.id }}">
+              {{ variant.title }}
+              {%- if variant.available == false %} - {{ 'products.product.sold_out' | t }}{% endif %}
+              - {{ variant.price | money | strip_html }}
+            </option>
+          {%- endfor -%}
+        </select>
+      </div>
+    </div>
+  </noscript>
+
+
+  <!-- stock level -->
+  <!-- stock level -->
+  {% if settings.stock_level_threshold > 0 %}
+
+    {%- liquid
+
+      assign show_hidden_class = false
+      if current_variant.inventory_management and current_variant.inventory_quantity < settings.stock_level_threshold and current_variant.inventory_quantity > 0
+        assign show_hidden_class = true
+      endif
+
+    -%}
+
+    {% capture variant_stock_levels_classes %}
+      variant-stock-levels js-variant-stock-levels variant-stock-levels--{{ section.id }} {% unless show_hidden_class %}visually-hidden{% endunless %}
+    {% endcapture %}
+
+    <div
+      id="variant-stock-levels--{{ section.id }}"
+      class="{{ variant_stock_levels_classes | strip }}"
+      data-stock-level-threshold="{{ settings.stock_level_threshold }}"
+    >
+      <div class="variant-stock-levels__inner">
+        {% render 'snip-icons',
+          wrapper: '.variant-stock-levels__icon',
+          type: 'apollo',
+          icon: 'error',
+          classes: 'variant-stock-levels__svg',
+          size: '14px',
+          fill: 'var(--text-color)',
+          hover: 'var(--text-color)' %}
+        <span class="js-variant-stock-levels__message">
+          {{ 'products.product.only_left' | t: count: current_variant.inventory_quantity }}
+        </span>
+      </div>
+    </div><!-- /#variant-stock-levels -->
+  {% endif %}
+
+  <!-- quantity selector -->
+  {% if settings.show_quantity %}
+    <label
+      class="option-label"
+      for="product-qty-{{ product.id }}">
+      {{ 'products.product.quantity' | t }}
+    </label>
+    <div class="quantity-selector mb20">
+      <button
+        class="quantity-control-down"
+        type="button">
+        <span class="visually-hidden">{{ 'cart.general.decrease' | t: product: product.title | escape }}</span>
+      -</button>
+      <input
+        id="product-qty-{{ product.id }}"
+        type="text"
+        name="quantity"
+        class="product-qty quantity" {% if current_variant.inventory_management == 'shopify' %}{% unless current_variant.inventory_policy == 'continue' %}
+        data-limit="{{ current_variant.inventory_quantity }}"
+        {% endunless %}{% endif %}
+        value="1"
+        style="max-width: 50px; text-align: center; margin: 0 auto 10px;"/>
+      <button
+        class="quantity-control-up"
+        type="button">
+        <span class="visually-hidden">{{ 'cart.general.increase' | t: product: product.title | escape }}</span>
+      +</button>
+    </div>
+  {% endif %}
+
+  <!-- product add -->
+  <div class="product-add clearfix">
+    <input class="formVariantId" name="" type="hidden" value="{{ product.selected_or_first_available_variant.id }}">
+    <div
+      class="note note-success mt3 js-added-msg"
+      style="display: none">
+      <strong>{{ 'products.product.added' | t }}</strong>
+      <a
+        class="underline"
+        href="{{ routes.cart_url }}">
+        {{ 'products.product.view_cart' | t }}
+      </a>
+      {{ 'products.product.or' | t }}
+      <a
+        class="underline"
+        href="{{ routes.all_products_collection_url }}">
+      {{ 'products.product.continue' | t }}
+      </a>.
+    </div><!-- /.note.note-success -->
+    <div
+      class="note note-error js-error-msg"
+      style="display: none">
+      <strong>{{ 'cart.general.cart_error' | t }}</strong> {{ 'cart.general.update_qty_error' | t }}
+    </div><!-- /.note.note-error -->
+    <input
+      type="submit"
+      name="button"
+      class="add clearfix mb10 AddtoCart js-ajax-submit {% if settings.show_payment_button and product.selling_plan_groups.size == 0 %} secondary-button{% endif %}"
+      value="{{ call_to_action }}"
+      {% unless current_variant.available %}
+      disabled
+      {% endunless %}/>
+    {% if settings.show_payment_button %}
+      {{ form | payment_button }}
+    {% endif %}
+  </div>
+
+  <!-- sticky cart -->
+  {% if type.settings.pf_show_sticky_cart %}
+    <div id="sticky-cart" class="js-sticky-cart" data-product-sticky-bar>
+      <div class="product-info">
+        <h4 >{{ product.title }}</h4>
+        {% render 'product-price', variant: current_variant, product: product %}
+      </div>
+      {% for option in product.options_with_values %}
+        {% if product.variants.size > 1 %}
+          {% if current_variant.option1 and forloop.index == 1 %}
+            <div id="current-option-1" class="current-option">
+              <p class="option-label">{{ option.name }}</p>
+              <p class="option-selected">{{ current_variant.option1 }}</p>
+            </div>
+          {% endif %}
+          {% if current_variant.option2 and forloop.index == 2 %}
+            <div id="current-option-2" class="current-option">
+              <p class="option-label">{{ option.name }}</p>
+              <p class="option-selected">{{ current_variant.option2 }}</p>
+            </div>
+          {% endif %}
+          {% if current_variant.option3 and forloop.index == 3 %}
+            <div id="current-option-3" class="current-option">
+              <p class="option-label">{{ option.name }}</p>
+              <p class="option-selected">{{ current_variant.option3 }}</p>
+            </div>
+          {% endif %}
+        {% endif %}
+      {% endfor %}
+      <div class="product-add">
+        <input class="formVariantId" name="" type="hidden" value="{{ product.selected_or_first_available_variant.id }}">
+        <div class="note note-success mt3 js-added-msg" style="display: none">
+          <strong>{{ 'products.product.added' | t }}</strong> <a class="underline" href="{{ routes.cart_url }}">{{ 'products.product.view_cart' | t }}</a> {{ 'products.product.or' | t }} <a class="underline" href="{{ routes.all_products_collection_url }}">{{ 'products.product.continue' | t }}</a>.
+        </div>
+        <div class="note note-error js-error-msg" style="display: none">
+          <strong>{{ 'cart.general.cart_error' | t }}</strong> {{ 'cart.general.update_qty_error' | t }}
+        </div>
+        <input type="submit" name="button" class="sticky-add clearfix mb10 AddtoCart secondary-button js-ajax-submit" value="{{ call_to_action }}" {% unless current_variant.available %}disabled{% endunless %} />
+      </div>
+    </div>
+  {% endif %}
+{% endform %}

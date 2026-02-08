@@ -1,0 +1,1 @@
+{"sections":{"banner":{"type":"banner-image","settings":{}},"main":{"type":"main-page","settings":{"reduced-width":false}},"text":{"type":"rich-text","settings":{"heading":"","rich_text":"<p>Add some content to your contact page<\/p>","page":"","section_padding":"both"}},"form":{"type":"contact-form","settings":{}}},"order":["banner","main","text","form"]}

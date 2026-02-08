@@ -1,0 +1,537 @@
+{% comment %}
+  ═══════════════════════════════════════════════════════════════════════════
+  BONHOMME ALLUMETTE - VERSION "UNE SEULE TRAVERSÉE"
+  ═══════════════════════════════════════════════════════════════════════════
+  
+  Le bonhomme:
+  - Apparaît après 30 secondes d'inactivité
+  - N'est PAS affecté par l'activité une fois apparu
+  - Traverse l'écran une seule fois puis disparaît
+  - Ne revient jamais (jusqu'au rechargement de la page)
+  
+  ═══════════════════════════════════════════════════════════════════════════
+{% endcomment %}
+
+<style>
+  #stickman-navbar-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 5;                                    /* ← Z-INDEX: Augmentez si le bonhomme passe derrière d'autres éléments */
+    pointer-events: none;
+    opacity: 0;                                    /* ← OPACITÉ INITIALE: Invisible au départ */
+    transition: opacity 0.5s ease-in-out;         /* ← VITESSE D'APPARITION: 0.5s = demi-seconde | 0.3s (rapide) ou 1s (lent) */
+  }
+  
+  #stickman-navbar-canvas.visible {
+    opacity: 1;                                    /* ← OPACITÉ VISIBLE: Complètement visible */
+  }
+  
+  .stickman-navbar-container {
+    position: relative;
+    pointer-events: auto;
+  }
+</style>
+
+<canvas id="stickman-navbar-canvas"></canvas>
+
+<script>
+(function() {
+  const canvas = document.getElementById('stickman-navbar-canvas');
+  if (!canvas) return;
+  
+  const ctx = canvas.getContext('2d');
+  const navbar = canvas.closest('.stickman-navbar-container') || canvas.parentElement;
+  
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 🕐 SYSTÈME D'INACTIVITÉ - UNE SEULE FOIS
+  // ═══════════════════════════════════════════════════════════════════════════
+  
+  const INACTIVITY_DELAY = 30000;                  /* ← DÉLAI D'INACTIVITÉ: En millisecondes
+                                                         10000 = 10 secondes
+                                                         30000 = 30 secondes (défaut)
+                                                         60000 = 1 minute */
+  
+  let inactivityTimer = null;
+  let isStickmanActive = false;
+  let hasStickmanAppeared = false;                 // ← NOUVEAU: Suivre si le bonhomme est déjà apparu
+  let animationFrameId = null;
+  
+  // Événements qui réinitialisent le timer d'inactivité (SEULEMENT avant l'apparition)
+  const resetEvents = [                            /* ← ÉVÉNEMENTS DÉTECTÉS avant l'apparition */
+    'mousemove', 
+    'mousedown', 
+    'keypress', 
+    'scroll', 
+    'touchstart', 
+    'click'
+  ];
+  
+  function startInactivityTimer() {
+    // Ne démarre le timer QUE si le bonhomme n'est jamais apparu
+    if (hasStickmanAppeared) return;
+    
+    clearTimeout(inactivityTimer);
+    
+    inactivityTimer = setTimeout(() => {
+      showStickman();
+    }, INACTIVITY_DELAY);
+  }
+  
+  function showStickman() {
+    if (isStickmanActive || hasStickmanAppeared) return;
+    
+    isStickmanActive = true;
+    hasStickmanAppeared = true;                    // ← Marque qu'il est apparu (ne reviendra jamais)
+    canvas.classList.add('visible');
+    
+    // Retire tous les écouteurs d'événements (le bonhomme ne disparaîtra plus)
+    resetEvents.forEach(eventName => {
+      document.removeEventListener(eventName, startInactivityTimer);
+    });
+    
+    lastTimestamp = 0;
+    x = -30;                                       /* ← POSITION DE DÉPART: -30 = hors écran à gauche */
+    state = 'walk';
+    stateTime = 0;
+    walkTime = 0;
+    runDistance = 0;
+    
+    animate(performance.now());
+  }
+  
+  // Écoute les événements SEULEMENT avant l'apparition
+  resetEvents.forEach(eventName => {
+    document.addEventListener(eventName, startInactivityTimer, { passive: true });
+  });
+  
+  startInactivityTimer();
+  
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 🎨 APPARENCE DU BONHOMME
+  // ═══════════════════════════════════════════════════════════════════════════
+  
+  function resize() {
+    const rect = navbar.getBoundingClientRect();
+    canvas.width = rect.width * devicePixelRatio;
+    canvas.height = rect.height * devicePixelRatio;
+    canvas.style.width = rect.width + 'px';
+    canvas.style.height = rect.height + 'px';
+    ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  }
+  resize();
+  window.addEventListener('resize', resize);
+  
+  const S = 0.72;                                  /* ← TAILLE DU BONHOMME: 0.5 = petit, 0.72 = défaut, 1.0 = grand */
+  const BASE_SPEED = 50;                           /* ← VITESSE DE MARCHE: 30 = lent, 50 = normal, 80 = rapide */
+  const BASE_WALK_FREQ = 3.2;                      /* ← FRÉQUENCE DES PAS: 2.0 = lents, 3.2 = normal, 5.0 = rapides */
+  const RUN_SPEED = 150;                           /* ← VITESSE DE COURSE: 100 = lent, 150 = normal, 250 = rapide */
+  const RUN_WALK_FREQ = 7.0;                       /* ← FRÉQUENCE EN COURANT: 5.0 = lent, 7.0 = normal, 10.0 = rapide */
+  const MOUSE_RADIUS = 150;                        /* ← DISTANCE DE RÉACTION: 100 = proche, 150 = normal, 250 = loin */
+  const COL = '#f5e6c8';                           /* ← COULEUR: '#f5e6c8' = beige, '#ffffff' = blanc, '#000000' = noir */
+  
+  let currentSpeed = BASE_SPEED;
+  let currentFreq = BASE_WALK_FREQ;
+  
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 🖱️ DÉTECTION DE LA SOURIS
+  // ═══════════════════════════════════════════════════════════════════════════
+  
+  let mouseX = -9999;
+  let mouseY = -9999;
+  
+  navbar.addEventListener('mousemove', (e) => {
+    const rect = navbar.getBoundingClientRect();
+    mouseX = e.clientX - rect.left;
+    mouseY = e.clientY - rect.top;
+  });
+  navbar.addEventListener('mouseleave', () => {
+    mouseX = -9999;
+    mouseY = -9999;
+  });
+  
+  let lastTimestamp = 0;
+  let x = -30;
+  
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 🎬 ANIMATION ET ÉTATS
+  // ═══════════════════════════════════════════════════════════════════════════
+  
+  let state = 'walk';
+  let stateTime = 0;
+  let walkTime = 0;
+  let runDistance = 0;
+  
+  const RUN_THRESHOLD = 0.6;                       /* ← SEUIL POUR COURIR: 0.3 = facile, 0.6 = normal, 0.9 = difficile */
+  const SLIP_FALL_DUR = 1.0;                       /* ← DURÉE CHUTE: 0.5 = rapide, 1.0 = normal, 2.0 = lent */
+  const SLIP_AIR_DUR = 0.6;                        /* ← DURÉE EN L'AIR: 0.3 = rapide, 0.6 = normal, 1.0 = lent */
+  const SLIP_FLOOR_DUR = 2.0;                      /* ← DURÉE ÉTOURDI: 1.0 = court, 2.0 = normal, 4.0 = long */
+  const SLIP_GETUP_DUR = 1.2;                      /* ← DURÉE POUR SE RELEVER: 0.8 = rapide, 1.2 = normal, 2.0 = lent */
+  
+  const FADE_OUT_DURATION = 1.0;                   /* ← DURÉE DISPARITION: Temps pour disparaître en fondu à la fin */
+  
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 🧮 FONCTIONS MATHÉMATIQUES
+  // ═══════════════════════════════════════════════════════════════════════════
+  
+  function lerp(a, b, t) { return a + (b - a) * clamp01(t); }
+  function clamp01(t) { return Math.max(0, Math.min(1, t)); }
+  function easeOutBounce(t) {
+    if (t<1/2.75) return 7.5625*t*t;
+    if (t<2/2.75) return 7.5625*(t-=1.5/2.75)*t+.75;
+    if (t<2.5/2.75) return 7.5625*(t-=2.25/2.75)*t+.9375;
+    return 7.5625*(t-=2.625/2.75)*t+.984375;
+  }
+  function easeInQuad(t) { return t*t; }
+  function easeOutQuad(t) { return t*(2-t); }
+  function easeInOutSine(t) { return -(Math.cos(Math.PI*t)-1)/2; }
+  function easeOutBack(t) { const c = 1.70158; return 1 + (c+1)*Math.pow(t-1,3) + c*Math.pow(t-1,2); }
+  
+  function blendPoses(a, b, t) {
+    const result = {};
+    for (const key in a) result[key] = lerp(a[key], b[key], clamp01(t));
+    return result;
+  }
+  
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 📏 DIMENSIONS DU BONHOMME
+  // ═══════════════════════════════════════════════════════════════════════════
+  
+  const HEAD_R = 4.5 * S;
+  const BODY_LEN = 13 * S;
+  const UPPER_ARM = 8.5 * S;
+  const FOREARM = 7.5 * S;
+  const THIGH_LEN = 10.5 * S;
+  const SHIN_LEN = 10.5 * S;
+  const BONE_W = 2.2 * S;                          /* ← ÉPAISSEUR MEMBRES: 2.2 = normal, 3.0 = épais, 1.5 = fin */
+  const JOINT_R = 1.3 * S;                         /* ← TAILLE ARTICULATIONS: 1.3 = normal, 2.0 = gros, 0.8 = petit */
+  
+  const STANDING_HIP_OFFSET = THIGH_LEN + SHIN_LEN - 6 * S;
+  
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 🎨 FONCTIONS DE DESSIN
+  // ═══════════════════════════════════════════════════════════════════════════
+  
+  function drawBone(x1, y1, x2, y2) {
+    ctx.lineWidth = BONE_W;
+    ctx.strokeStyle = COL;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+  }
+  
+  function drawJoint(jx, jy) {
+    ctx.fillStyle = COL;
+    ctx.beginPath();
+    ctx.arc(jx, jy, JOINT_R, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  
+  function endpoint(ox, oy, angle, len) {
+    return { x: ox + Math.sin(angle) * len, y: oy + Math.cos(angle) * len };
+  }
+  
+  function drawFigure(hipX, hipY, a) {
+    const shoulder = endpoint(hipX, hipY, a.bodyTilt - Math.PI, BODY_LEN);
+    const headPos = endpoint(shoulder.x, shoulder.y, a.bodyTilt - Math.PI + a.headTilt, HEAD_R + 1.5 * S);
+    
+    const lKnee = endpoint(hipX, hipY, a.lThigh, THIGH_LEN);
+    const lFoot = endpoint(lKnee.x, lKnee.y, a.lThigh - a.lKnee, SHIN_LEN);
+    const rKnee = endpoint(hipX, hipY, a.rThigh, THIGH_LEN);
+    const rFoot = endpoint(rKnee.x, rKnee.y, a.rThigh - a.rKnee, SHIN_LEN);
+    
+    const lElbow = endpoint(shoulder.x, shoulder.y, a.lArm, UPPER_ARM);
+    const lHand  = endpoint(lElbow.x, lElbow.y, a.lArm + a.lElbow, FOREARM);
+    const rElbow = endpoint(shoulder.x, shoulder.y, a.rArm, UPPER_ARM);
+    const rHand  = endpoint(rElbow.x, rElbow.y, a.rArm + a.rElbow, FOREARM);
+    
+    drawBone(hipX, hipY, lKnee.x, lKnee.y);
+    drawBone(lKnee.x, lKnee.y, lFoot.x, lFoot.y);
+    drawJoint(lKnee.x, lKnee.y);
+    drawBone(shoulder.x, shoulder.y, lElbow.x, lElbow.y);
+    drawBone(lElbow.x, lElbow.y, lHand.x, lHand.y);
+    drawJoint(lElbow.x, lElbow.y);
+    ctx.lineWidth = BONE_W * 1.15; ctx.strokeStyle = COL; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(hipX, hipY); ctx.lineTo(shoulder.x, shoulder.y); ctx.stroke();
+    drawBone(hipX, hipY, rKnee.x, rKnee.y);
+    drawBone(rKnee.x, rKnee.y, rFoot.x, rFoot.y);
+    drawJoint(rKnee.x, rKnee.y);
+    drawBone(shoulder.x, shoulder.y, rElbow.x, rElbow.y);
+    drawBone(rElbow.x, rElbow.y, rHand.x, rHand.y);
+    drawJoint(rElbow.x, rElbow.y);
+    drawJoint(hipX, hipY);
+    drawJoint(shoulder.x, shoulder.y);
+    ctx.fillStyle = COL;
+    ctx.beginPath();
+    ctx.arc(headPos.x, headPos.y, HEAD_R, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 🚶 ANIMATION DE MARCHE
+  // ═══════════════════════════════════════════════════════════════════════════
+  
+  const WALK_KEYFRAMES = [
+    { bodyTilt:-0.06, headTilt:0, rThigh:0.50, rKnee:0.02, lThigh:-0.38, lKnee:0.12, rArm:-0.35, rElbow:0.40, lArm:0.35, lElbow:0.50 },
+    { bodyTilt:-0.05, headTilt:0, rThigh:0.35, rKnee:0.20, lThigh:-0.28, lKnee:0.30, rArm:-0.25, rElbow:0.35, lArm:0.25, lElbow:0.40 },
+    { bodyTilt:-0.04, headTilt:0, rThigh:0.05, rKnee:0.04, lThigh:0.05, lKnee:0.90, rArm:-0.05, rElbow:0.25, lArm:0.05, lElbow:0.25 },
+    { bodyTilt:-0.06, headTilt:0, rThigh:-0.20, rKnee:0.08, lThigh:0.38, lKnee:0.30, rArm:0.20, rElbow:0.40, lArm:-0.20, lElbow:0.35 },
+    { bodyTilt:-0.06, headTilt:0, lThigh:0.50, lKnee:0.02, rThigh:-0.38, rKnee:0.12, lArm:-0.35, lElbow:0.40, rArm:0.35, rElbow:0.50 },
+    { bodyTilt:-0.05, headTilt:0, lThigh:0.35, lKnee:0.20, rThigh:-0.28, rKnee:0.30, lArm:-0.25, lElbow:0.35, rArm:0.25, rElbow:0.40 },
+    { bodyTilt:-0.04, headTilt:0, lThigh:0.05, lKnee:0.04, rThigh:0.05, rKnee:0.90, lArm:-0.05, lElbow:0.25, rArm:0.05, rElbow:0.25 },
+    { bodyTilt:-0.06, headTilt:0, lThigh:-0.20, lKnee:0.08, rThigh:0.38, rKnee:0.30, lArm:-0.20, lElbow:0.40, rArm:0.20, rElbow:0.35 },
+  ];
+  const WALK_PHASES = [0, 0.12, 0.25, 0.38, 0.50, 0.62, 0.75, 0.88];
+  
+  function getWalkAngles(t) {
+    const cyclePos = ((t * currentFreq) % 1 + 1) % 1;
+    let i0 = 0;
+    for (let i = 0; i < WALK_PHASES.length; i++) {
+      if (cyclePos >= WALK_PHASES[i]) i0 = i;
+    }
+    const i1 = (i0 + 1) % WALK_KEYFRAMES.length;
+    const p0 = WALK_PHASES[i0];
+    const p1 = i1 === 0 ? 1.0 : WALK_PHASES[i1];
+    const seg = p1 - p0;
+    const localT = seg > 0 ? (cyclePos - p0) / seg : 0;
+    const smooth = easeInOutSine(clamp01(localT));
+    const kf0 = WALK_KEYFRAMES[i0], kf1 = WALK_KEYFRAMES[i1];
+    const r = {};
+    for (const k in kf0) r[k] = lerp(kf0[k], kf1[k], smooth);
+    return r;
+  }
+  
+  function getHipBob(t) {
+    const c = ((t * currentFreq) % 1 + 1) % 1;
+    return -Math.cos(c * Math.PI * 4) * 0.8 * S;  /* ← BOUNCE VERTICAL: 0.8 = normal, 1.5 = beaucoup, 0.3 = peu */
+  }
+  
+  function standPose() {
+    return { bodyTilt:-0.04, headTilt:0, lThigh:0.02, lKnee:0.03, rThigh:-0.02, rKnee:0.03, lArm:0.10, lElbow:0.20, rArm:0.10, rElbow:0.20 };
+  }
+  
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 💥 ANIMATION DE CHUTE
+  // ═══════════════════════════════════════════════════════════════════════════
+  
+  function slipFallPose(t) {
+    const e = easeInQuad(clamp01(t));
+    return {
+      bodyTilt: lerp(-0.06, 0.8, e),
+      headTilt: lerp(0, 0.4, e),
+      rThigh: lerp(0.0, 1.2, e),
+      rKnee: lerp(0.04, 0.1, e),
+      lThigh: lerp(-0.3, 0.9, e),
+      lKnee: lerp(0.10, 0.15, e),
+      rArm: lerp(0.10, -1.5, e),
+      rElbow: lerp(0.20, -0.8, e),
+      lArm: lerp(0.10, -2.0, e),
+      lElbow: lerp(0.20, -0.5, e),
+    };
+  }
+  
+  function slipAirPose(t) {
+    const e = easeInOutSine(clamp01(t));
+    return {
+      bodyTilt: lerp(0.8, 0.5, e),
+      headTilt: lerp(0.4, 0.2, e),
+      rThigh: lerp(1.2, 0.8, e), rKnee: lerp(0.1, 0.3, e),
+      lThigh: lerp(0.9, 0.5, e), lKnee: lerp(0.15, 0.4, e),
+      rArm: lerp(-1.5, -1.0, e), rElbow: lerp(-0.8, 0.3, e),
+      lArm: lerp(-2.0, -1.2, e), lElbow: lerp(-0.5, 0.4, e),
+    };
+  }
+  
+  function slipSittingPose() {
+    return {
+      bodyTilt: 0.45,
+      headTilt: 0.1,
+      rThigh: 0.65, rKnee: 0.25,
+      lThigh: 0.75, lKnee: 0.2,
+      rArm: 0.8, rElbow: 0.3,
+      lArm: -0.5, lElbow: 0.4,
+    };
+  }
+  
+  function drawStars(cx, cy, t) {
+    const count = 3;                               /* ← NOMBRE D'ÉTOILES: 2 = peu, 3 = normal, 5 = beaucoup */
+    ctx.fillStyle = COL;
+    ctx.globalAlpha = 0.7;                         /* ← OPACITÉ ÉTOILES: 0.5 = transparent, 0.7 = normal, 1.0 = opaque */
+    for (let i = 0; i < count; i++) {
+      const angle = t * 4 + (i * Math.PI * 2 / count);
+      const radius = HEAD_R * 1.8;                 /* ← DISTANCE ÉTOILES: 1.5 = proche, 1.8 = normal, 2.5 = loin */
+      const sx = cx + Math.cos(angle) * radius;
+      const sy = cy + Math.sin(angle) * radius;
+      const size = 1.2 * S;                        /* ← TAILLE ÉTOILES: 0.8 = petit, 1.2 = normal, 2.0 = grand */
+      
+      ctx.beginPath();
+      for (let j = 0; j < 4; j++) {
+        const a = j * Math.PI / 2 + t * 3;
+        ctx.moveTo(sx, sy);
+        ctx.lineTo(sx + Math.cos(a) * size, sy + Math.sin(a) * size);
+      }
+      ctx.lineWidth = 0.8 * S;
+      ctx.strokeStyle = COL;
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1.0;
+  }
+  
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 🎬 BOUCLE D'ANIMATION PRINCIPALE
+  // ═══════════════════════════════════════════════════════════════════════════
+  
+  let fadeOutStartTime = null;
+  
+  function animate(timestamp) {
+    if (!isStickmanActive) return;
+    
+    if (!lastTimestamp) lastTimestamp = timestamp;
+    const dt = (timestamp - lastTimestamp) / 1000;
+    lastTimestamp = timestamp;
+    
+    const rect = navbar.getBoundingClientRect();
+    const w = rect.width;
+    const h = rect.height;
+    ctx.clearRect(0, 0, w, h);
+    
+    const floorY = h - 1;
+    const standHipY = floorY - STANDING_HIP_OFFSET;
+    
+    stateTime += dt;
+    
+    const dist = Math.sqrt((mouseX - x) * (mouseX - x) + (mouseY - (standHipY - BODY_LEN * 0.5)) * (mouseY - (standHipY - BODY_LEN * 0.5)));
+    const proximity = clamp01(1 - dist / MOUSE_RADIUS);
+    const smoothProx = proximity * proximity;
+    currentSpeed = lerp(BASE_SPEED, RUN_SPEED, smoothProx);
+    currentFreq = lerp(BASE_WALK_FREQ, RUN_WALK_FREQ, smoothProx);
+    
+    let angles;
+    let hipX = x;
+    let hipY = standHipY;
+    let moving = false;
+    let drawStarsFlag = false;
+    
+    switch (state) {
+      case 'walk':
+        moving = true;
+        walkTime += dt;
+        angles = getWalkAngles(walkTime);
+        hipY = standHipY + getHipBob(walkTime);
+        
+        if (proximity > RUN_THRESHOLD) {
+          runDistance += currentSpeed * dt;
+        } else {
+          runDistance = Math.max(0, runDistance - BASE_SPEED * dt * 0.5);
+        }
+        
+        if (runDistance >= w * 0.25) {             /* ← DISTANCE AVANT CHUTE: 0.15 = rapide, 0.25 = normal, 0.5 = moitié écran */
+          state = 'slip';
+          stateTime = 0;
+          runDistance = 0;
+        }
+        break;
+        
+      case 'slip': {
+        const t = stateTime / SLIP_FALL_DUR;
+        const walkSnap = getWalkAngles(walkTime);
+        const slip = slipFallPose(t);
+        angles = t < 0.15 ? blendPoses(walkSnap, slip, t / 0.15) : slip;
+        const upT = clamp01(t * 2.5);
+        const upDown = upT < 0.4
+          ? lerp(0, -8 * S, easeOutQuad(upT / 0.4))
+          : lerp(-8 * S, 0, easeInQuad((upT - 0.4) / 0.6));
+        hipY = standHipY + upDown;
+        hipX = x + lerp(0, 5 * S, t);
+        if (stateTime >= SLIP_FALL_DUR) { state = 'slipAir'; stateTime = 0; }
+        break;
+      }
+      case 'slipAir': {
+        const t = stateTime / SLIP_AIR_DUR;
+        angles = blendPoses(slipAirPose(0), slipSittingPose(), easeOutBounce(clamp01(t)));
+        hipY = lerp(standHipY - 4 * S, floorY - THIGH_LEN * 0.4, easeOutBounce(clamp01(t)));
+        hipX = x + 5 * S + lerp(0, 3 * S, t);
+        if (stateTime >= SLIP_AIR_DUR) { state = 'slipFloor'; stateTime = 0; }
+        break;
+      }
+      case 'slipFloor': {
+        angles = slipSittingPose();
+        hipY = floorY - THIGH_LEN * 0.4;
+        hipX = x + 8 * S;
+        drawStarsFlag = true;
+        
+        const lt = stateTime;
+        if (lt > 0.3) {
+          angles.headTilt += Math.sin((lt - 0.3) * 8) * 0.15 * Math.max(0, 1 - (lt - 0.3) / 1.5);
+        }
+        if (lt > 1.2 && lt < 1.8) {
+          angles.headTilt += lerp(0, -0.2, easeInOutSine((lt - 1.2) / 0.6));
+        }
+        if (stateTime >= SLIP_FLOOR_DUR) { state = 'slipGetup'; stateTime = 0; }
+        break;
+      }
+      case 'slipGetup': {
+        const t = stateTime / SLIP_GETUP_DUR;
+        const e = easeOutBack(clamp01(t));
+        angles = blendPoses(slipSittingPose(), standPose(), e);
+        hipY = lerp(floorY - THIGH_LEN * 0.4, standHipY, easeOutQuad(t));
+        hipX = x + 8 * S;
+        if (t > 0.5 && t < 0.9) {
+          const dustT = (t - 0.5) / 0.4;
+          angles.rArm += Math.sin(dustT * Math.PI * 3) * 0.3;
+        }
+        if (stateTime >= SLIP_GETUP_DUR) {
+          x += 8 * S;
+          state = 'walk';
+          stateTime = 0;
+        }
+        break;
+      }
+    }
+    
+    if (moving) x += currentSpeed * dt;
+    
+    // ═══ NOUVEAU: Quand il sort de l'écran, faire un fade out puis arrêter ═══
+    if (x > w + 40) {
+      if (!fadeOutStartTime) {
+        fadeOutStartTime = timestamp;
+      }
+      
+      const fadeProgress = (timestamp - fadeOutStartTime) / (FADE_OUT_DURATION * 1000);
+      
+      if (fadeProgress >= 1.0) {
+        // Disparition complète - Arrêter l'animation définitivement
+        canvas.classList.remove('visible');
+        isStickmanActive = false;
+        
+        if (animationFrameId) {
+          cancelAnimationFrame(animationFrameId);
+          animationFrameId = null;
+        }
+        
+        ctx.clearRect(0, 0, w, h);
+        return; // Fin de l'animation pour toujours
+      } else {
+        // Fade out en cours
+        ctx.globalAlpha = 1.0 - fadeProgress;
+      }
+    }
+    
+    drawFigure(hipX, hipY, angles);
+    
+    if (drawStarsFlag) {
+      const shoulder = endpoint(hipX, hipY, angles.bodyTilt - Math.PI, BODY_LEN);
+      const headPos = endpoint(shoulder.x, shoulder.y, angles.bodyTilt - Math.PI + angles.headTilt, HEAD_R + 1.5 * S);
+      drawStars(headPos.x, headPos.y - HEAD_R * 1.5, stateTime);
+    }
+    
+    ctx.globalAlpha = 1.0; // Reset pour la prochaine frame
+    
+    animationFrameId = requestAnimationFrame(animate);
+  }
+})();
+</script>

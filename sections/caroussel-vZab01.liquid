@@ -1,0 +1,554 @@
+{%- liquid
+
+  assign section_padding = ''
+  if section.settings.section_padding == 'top'
+    assign section_padding = 'pb0'
+  elsif section.settings.section_padding == 'bottom'
+    assign section_padding = 'pt0'
+  elsif section.settings.section_padding == 'none'
+    assign section_padding = 'pt0 pb0'
+  endif
+
+  assign collection = collections[section.settings.collection]
+
+  assign limit = section.settings.limit
+  assign grid = section.settings.grid
+  assign enough_to_wrap = true
+  assign is_carousel = true
+
+  if limit <= grid
+    assign is_carousel = false
+    assign enough_to_wrap = false
+  endif
+
+  case section.settings.grid
+    when 2
+      assign prod_grid = 50
+    when 3
+      assign prod_grid = 33.333
+    when 4
+      assign prod_grid = 25
+    when 5
+      assign prod_grid = 20
+  endcase
+
+  assign groupCells = true
+  if section.settings.ungroup_cells
+    assign groupCells = false
+  endif
+
+-%}
+<section class="global__section padding-top {{ section_padding }} collection__carousel-{{ section.id }}{% if settings.animation != 'none' %} animate {{ settings.animation }}{% endif %}"
+  data-section-id="{{ section.id }}"
+  data-section-loaded="false"
+  data-section-type="carousel-section">
+
+    {% capture slideshow_config %}{
+    "wrapAround":{{ enough_to_wrap }},
+    "cellAlign": "left",
+    "dragThreshold":{{ enough_to_wrap }},
+    "pauseAutoPlayOnHover":false,
+    "freeScroll": true,
+    "contain": true,
+    "prevNextButtons": {{ enough_to_wrap }},
+    "pageDots": {{ enough_to_wrap }},
+    "groupCells": {{ groupCells }}
+    }{% endcapture %}
+
+  <div class="row grid__wrapper collection__carousel-section collection__carousel-section--fullwidth">
+    
+    <!-- Header Section with Title and Link -->
+    <div class="collection__carousel-header span-12 auto{% if section.settings.title_alignment == 'left' %} title-align-left{% endif %}">
+      {% if section.settings.heading != blank %}
+        <h2 class="collection__carousel-title">{{ section.settings.heading | escape }}</h2>
+      {% endif %}
+      {% if collection != blank and section.settings.show_collection_link %}
+        <a href="{{ collection.url }}" class="collection__carousel-link">
+          {{ section.settings.link_text | default: "Voir toute la collection" }}
+        </a>
+      {% endif %}
+    </div>
+
+    <!-- Products Carousel -->
+    <div class="product-loop {% if is_carousel %}flickity__section js-carousel section--carousel {% endif %}span-12 auto"{% if is_carousel %} data-flickity-config='{{ slideshow_config }}'{% endif %}>
+      {% for product in collection.products limit: limit %}
+        <div class="featured__collection-product product-index{% if settings.animation != 'none' and enough_to_wrap == false %} animate {{ settings.animation }} delay--{{ forloop.index }}{% endif %}" id="prod-{{ product.id }}" data-alpha="{{ product.title }}" data-price="{{ product.price }}" data-product-id="{{ product.id }}">
+          {% liquid
+            assign loading = 'lazy'
+            assign fetch_priority = 'auto'
+            if section.index == 1 and forloop.index <= section.settings.grid
+              assign loading = 'eager'
+              assign fetch_priority = 'high'
+            endif
+           %}
+          {% render 'product-listing', product: product, grid: section.settings.grid, loading: loading, fetchpriority: fetch_priority %}
+        </div>
+      {% endfor %}
+      {% if section.settings.collection == blank %}
+        {% render 'onboard-product', prod_limit: limit, grid: grid, is_carousel: is_carousel %}
+      {% endif %}
+    </div>
+  </div>
+
+  <style>
+
+    section.collection__carousel-{{ section.id }} {
+      {% if section.settings.color_scheme == 'none' %}
+        background: var(--background);
+      {% else %}
+        background: var(--{{ section.settings.color_scheme }}-background);
+      {% endif %}
+      position: relative;
+      padding-top: {{ section.settings.custom_padding_top }}px !important;
+      padding-bottom: {{ section.settings.custom_padding_bottom }}px !important;
+    }
+
+    {% if section.settings.enable_gradient_overlay %}
+    /* Top gradient overlay */
+    section.collection__carousel-{{ section.id }}:before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: {{ section.settings.gradient_top_height }}px;
+      background: linear-gradient(
+        to bottom,
+        {{ section.settings.gradient_top_color }},
+        transparent
+      );
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* Bottom gradient overlay */
+    section.collection__carousel-{{ section.id }}:after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: {{ section.settings.gradient_bottom_height }}px;
+      background: linear-gradient(
+        to top,
+        {{ section.settings.gradient_bottom_color }},
+        transparent
+      );
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    section.collection__carousel-{{ section.id }} .grid__wrapper {
+      position: relative;
+      z-index: 2;
+    }
+    {% endif %}
+
+    /* Header Styles */
+    .collection__carousel-{{ section.id }} .collection__carousel-header {
+      text-align: center;
+      margin-bottom: 30px;
+      padding: 0 20px;
+    }
+
+    .collection__carousel-{{ section.id }} .collection__carousel-title {
+      margin: 0 0 10px 0;
+      {% unless section.settings.color_scheme == 'none' %}
+        color: var(--{{ section.settings.color_scheme }}-color) !important;
+      {% endunless %}
+      {% if section.settings.enable_title_line %}
+        position: relative;
+        padding-bottom: 15px;
+      {% endif %}
+    }
+
+    {% if section.settings.enable_title_line %}
+    .collection__carousel-{{ section.id }} .collection__carousel-title:after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 3px;
+      background: {% if section.settings.color_scheme == 'none' %}var(--text-color){% else %}var(--{{ section.settings.color_scheme }}-color){% endif %};
+      animation: lineExpand 1s ease-out forwards;
+      animation-delay: 0.3s;
+    }
+
+    @media screen and (min-width: 741px) {
+      .collection__carousel-{{ section.id }} .collection__carousel-header.title-align-left .collection__carousel-title:after {
+        left: 0;
+        transform: translateX(0);
+      }
+    }
+
+    @keyframes lineExpand {
+      from {
+        width: 0;
+      }
+      to {
+        width: {{ section.settings.title_line_width }}px;
+      }
+    }
+    {% endif %}
+
+    .collection__carousel-{{ section.id }} .collection__carousel-link {
+      font-size: 14px;
+      text-decoration: underline;
+      transition: opacity 0.3s ease;
+      {% unless section.settings.color_scheme == 'none' %}
+        color: var(--{{ section.settings.color_scheme }}-color) !important;
+      {% else %}
+        color: var(--text-color);
+      {% endunless %}
+    }
+
+    .collection__carousel-{{ section.id }} .collection__carousel-link:hover {
+      opacity: 0.7;
+    }
+
+    /* Hide reviews and price */
+    .collection__carousel-{{ section.id }} .product-index .product-info .price,
+    .collection__carousel-{{ section.id }} .product-index .product-info .price-item,
+    .collection__carousel-{{ section.id }} .product-index .product-info .price__badge,
+    .collection__carousel-{{ section.id }} .product-index .product-info .price__badge--sold-out,
+    .collection__carousel-{{ section.id }} .product-index .product-info .spr-badge,
+    .collection__carousel-{{ section.id }} .product-index .product-info .stamped-product-reviews-badge,
+    .collection__carousel-{{ section.id }} .product-index .product-info .yotpo,
+    .collection__carousel-{{ section.id }} .product-index .product-info [class*="review"],
+    .collection__carousel-{{ section.id }} .product-index .product-info [class*="rating"] {
+      display: none !important;
+    }
+
+    {% if section.settings.enable_rounded_images %}
+    /* Rounded images */
+    .collection__carousel-{{ section.id }} .product-index .product_image img,
+    .collection__carousel-{{ section.id }} .product-index .product-image img,
+    .collection__carousel-{{ section.id }} .product-index img {
+      border-radius: {{ section.settings.image_border_radius }}px;
+      transition: transform 0.3s ease;
+    }
+
+    .collection__carousel-{{ section.id }} .product-index:hover .product_image img,
+    .collection__carousel-{{ section.id }} .product-index:hover .product-image img,
+    .collection__carousel-{{ section.id }} .product-index:hover img {
+      transform: translateY(-5px);
+    }
+    {% endif %}
+
+    {% unless section.settings.color_scheme == 'none' %}
+      section.collection__carousel-{{ section.id }} .product-index span.product-title,
+      section.collection__carousel-{{ section.id }} .product-index .product-info a,
+      section.collection__carousel-{{ section.id }} .product-index .product-info p,
+      section.collection__carousel-{{ section.id }} .product-index .product-info .price-item,
+      section.collection__carousel-{{ section.id }} .product-index .product-info .price__badge,
+      section.collection__carousel-{{ section.id }} .product-index .product-info .price__badge--sold-out {
+        color: var(--{{ section.settings.color_scheme }}-color) !important;
+      }
+    {% endunless %}
+
+    @media screen and (min-width: 741px) {
+      /* Left alignment option for desktop */
+      .collection__carousel-{{ section.id }} .collection__carousel-header.title-align-left {
+        text-align: left;
+      }
+
+      .collection__carousel-{{ section.id }} .product-loop {
+        width: 100%;
+        margin: 0 auto;
+        padding: 0 20px;
+      }
+      {% if is_carousel %}
+        .collection__carousel-{{ section.id }} .featured__collection-product {
+          width: {{ prod_grid }}%;
+          padding: 0 15px;
+        }
+      {% else %}
+        .collection__carousel-{{ section.id }} .product-loop {
+          display: grid;
+          grid-template-columns: repeat({{ grid }}, {{ prod_grid }}%);
+        }
+        .collection__carousel-{{ section.id }} .featured__collection-product {
+          box-sizing: border-box !important;
+          padding: 0 15px;
+        }
+      {% endif %}
+    }
+    
+    @media screen and (max-width: 740px) {
+      .collection__carousel-{{ section.id }} .collection__carousel-header {
+        margin-bottom: 20px;
+      }
+      
+      .collection__carousel-{{ section.id }} .product-loop {
+        width: 100%;
+        margin: 0;
+        padding: 0 15px;
+      }
+      {% if is_carousel %}
+        .collection__carousel-{{ section.id }} .featured__collection-product {
+          width: 50%;
+          padding: 0 10px;
+        }
+      {% else %}
+        .collection__carousel-{{ section.id }} .featured__collection-product {
+          padding: 0 10px;
+        }
+        .collection__carousel-{{ section.id }} .product-loop {
+          display: grid;
+          grid-template-columns: repeat(2, 50%);
+          grid-row-gap: 30px;
+        }
+      {% endif %}
+    }
+  </style>
+
+</section>
+
+{% schema %}
+{
+  "name": "Collection carousel",
+  "settings":
+  [
+    {
+      "id": "collection",
+      "type": "collection",
+      "label": "Collection"
+    },
+    {
+      "type": "range",
+      "id": "grid",
+      "min": 2,
+      "max": 5,
+      "step": 1,
+      "label": "Products visible (Desktop)",
+      "default": 4,
+      "info": "Mobile always shows 2 products"
+    },
+    {
+      "type": "range",
+      "id": "limit",
+      "min": 2,
+      "max": 30,
+      "step": 1,
+      "label": "Total number of products",
+      "default": 3
+    },
+    {
+      "type":"checkbox",
+      "id": "ungroup_cells",
+      "label": "Rotate 1 product at a time",
+      "default":false
+    },
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "Featured collection"
+    },
+    {
+      "type": "select",
+      "id": "title_alignment",
+      "label": "Title alignment (Desktop)",
+      "options": [
+        {
+          "value": "center",
+          "label": "Center"
+        },
+        {
+          "value": "left",
+          "label": "Left"
+        }
+      ],
+      "default": "center"
+    },
+    {
+      "type":"checkbox",
+      "id": "show_collection_link",
+      "label": "Show collection link",
+      "default":true
+    },
+    {
+      "type": "text",
+      "id": "link_text",
+      "label": "Link text",
+      "default": "Voir toute la collection"
+    },
+    {
+      "type": "select",
+      "id": "color_scheme",
+      "label": "Color scheme",
+      "options": [
+        {
+          "value": "none",
+          "label": "None"
+        },
+        {
+          "value": "cs1",
+          "label": "1"
+        },
+        {
+          "value": "cs2",
+          "label": "2"
+        },
+        {
+          "value": "cs3",
+          "label": "3"
+        }
+      ],
+      "default": "none"
+    },
+    {
+      "type": "select",
+      "id": "section_padding",
+      "label": "Section spacing",
+      "options": [
+        {
+          "value": "top",
+          "label": "Top"
+        },
+        {
+          "value": "bottom",
+          "label": "Bottom"
+        },
+        {
+          "value": "both",
+          "label": "Both"
+        },
+        {
+          "value": "none",
+          "label": "None"
+        }
+      ],
+      "default": "both"
+    },
+    {
+      "type": "header",
+      "content": "Design Effects"
+    },
+    {
+      "type": "range",
+      "id": "custom_padding_top",
+      "min": 0,
+      "max": 200,
+      "step": 10,
+      "unit": "px",
+      "label": "Padding top",
+      "default": 60,
+      "info": "Extra space at the top of the section"
+    },
+    {
+      "type": "range",
+      "id": "custom_padding_bottom",
+      "min": 0,
+      "max": 200,
+      "step": 10,
+      "unit": "px",
+      "label": "Padding bottom",
+      "default": 60,
+      "info": "Extra space at the bottom of the section"
+    },
+    {
+      "type": "checkbox",
+      "id": "enable_gradient_overlay",
+      "label": "Enable gradient overlay",
+      "default": false,
+      "info": "Adds color gradient at top and bottom of section"
+    },
+    {
+      "type": "paragraph",
+      "content": "Top gradient settings"
+    },
+    {
+      "type": "color",
+      "id": "gradient_top_color",
+      "label": "Top gradient color",
+      "default": "#000000",
+      "info": "Color fades from solid at top to transparent"
+    },
+    {
+      "type": "range",
+      "id": "gradient_top_height",
+      "min": 0,
+      "max": 300,
+      "step": 10,
+      "unit": "px",
+      "label": "Top gradient height",
+      "default": 100,
+      "info": "Height of the top gradient fade effect"
+    },
+    {
+      "type": "paragraph",
+      "content": "Bottom gradient settings"
+    },
+    {
+      "type": "color",
+      "id": "gradient_bottom_color",
+      "label": "Bottom gradient color",
+      "default": "#000000",
+      "info": "Color fades from solid at bottom to transparent"
+    },
+    {
+      "type": "range",
+      "id": "gradient_bottom_height",
+      "min": 0,
+      "max": 300,
+      "step": 10,
+      "unit": "px",
+      "label": "Bottom gradient height",
+      "default": 100,
+      "info": "Height of the bottom gradient fade effect"
+    },
+    {
+      "type": "checkbox",
+      "id": "enable_rounded_images",
+      "label": "Enable rounded images",
+      "default": true,
+      "info": "Adds rounded corners to product images"
+    },
+    {
+      "type": "range",
+      "id": "image_border_radius",
+      "min": 0,
+      "max": 50,
+      "step": 5,
+      "unit": "px",
+      "label": "Image corner radius",
+      "default": 15,
+      "info": "Only applies when rounded images are enabled"
+    },
+    {
+      "type": "checkbox",
+      "id": "enable_title_line",
+      "label": "Enable animated title underline",
+      "default": true,
+      "info": "Animated decorative line under the title"
+    },
+    {
+      "type": "range",
+      "id": "title_line_width",
+      "min": 30,
+      "max": 150,
+      "step": 10,
+      "unit": "px",
+      "label": "Title line width",
+      "default": 80,
+      "info": "Only applies when title underline is enabled"
+    }
+  ],
+  "presets":
+  [
+    {
+      "name": "Collection carousel vZAB"
+    }
+  ],
+  "disabled_on": {
+    "groups":[
+      "header",
+      "footer",
+      "aside"
+    ]
+  }
+}
+{% endschema %}
