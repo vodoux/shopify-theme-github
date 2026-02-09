@@ -1,0 +1,683 @@
+{%- liquid
+
+  assign section_padding = ''
+  if section.settings.section_padding == 'top'
+    assign section_padding = 'pb0'
+  elsif section.settings.section_padding == 'bottom'
+    assign section_padding = 'mt0'
+  elsif section.settings.section_padding == 'none'
+    assign section_padding = 'mt0 pb0'
+  endif
+
+  assign has_heading = false
+  assign has_heading_image = false
+  assign has_subheading = false
+  assign has_link = false
+  assign has_button_text = false
+  assign has_button = false
+  assign has_caption = false
+
+  if section.settings.heading_image != blank
+    assign has_heading_image = true
+    assign has_caption = true
+  elsif section.settings.video_heading != blank
+    assign heading = section.settings.video_heading | escape
+    assign has_heading = true
+    assign has_caption = true
+  endif
+
+  if section.settings.video_subheading != blank
+    assign subheading = section.settings.video_subheading | escape
+    assign has_subheading = true
+    assign has_caption = true
+  endif
+
+  if section.settings.video_button_link != blank
+    assign link = section.settings.video_button_link
+    assign has_link = true
+  endif
+
+  if section.settings.video_button_text != blank
+    assign button_text = section.settings.video_button_text | escape
+    assign has_button_text = true
+  endif
+
+  if has_button_text and has_link
+    assign has_caption = true
+    assign has_button = true
+  endif
+
+  assign heading_size = section.settings.slide_heading_size
+  assign subheading_size = section.settings.subheading_size
+  assign button_size = section.settings.button_size
+  assign text_color = section.settings.video_slide_text_color
+  assign button_color = section.settings.video_cta_background
+  assign button_text_color = section.settings.video_cta_color
+  assign caption_background = section.settings.video_caption_background
+  assign heading_image_width = section.settings.heading_image_width
+  assign filter_opacity = section.settings.video_filter_opacity
+  assign caption_max_width = section.settings.caption_max_width
+
+  case section.settings.video_caption_alignment
+    when 'center'
+      assign align_text = 'a-center'
+    when 'left'
+      assign align_text = 'a-left'
+    when 'right'
+      assign align_text = 'a-right'
+  endcase
+
+  assign audio = true
+  if section.settings.video_audio == 'on'
+    assign audio = false
+  endif
+
+-%}
+
+{% style %}
+#shopify-section-{{ section.id }} {
+  --h2-size:  {{ heading_size }}px;
+  --font-size:  {{ subheading_size }}px;
+  --button-size: {{ button_size }}px;
+  --text-color: {{ text_color }};
+  --section-background: {{ caption_background }};
+  --button-text: {{ button_text_color }};
+  --button-color: {{ button_color }};
+  --heading-image-width: {{ heading_image_width }}px;
+  --filter-opacity: {{ filter_opacity }}%;
+  --caption-max-width: {{ caption_max_width }}px;
+}
+
+/* Dark overlay filter */
+#shopify-section-{{ section.id }} .video-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, {{ filter_opacity | divided_by: 100.0 }});
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Heading image styling */
+#shopify-section-{{ section.id }} .caption .heading-image {
+  max-width: var(--heading-image-width);
+  width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto 1rem;
+}
+
+/* Button font size */
+#shopify-section-{{ section.id }} .caption .button {
+  font-size: var(--button-size);
+}
+
+/* Caption max width */
+#shopify-section-{{ section.id }} .caption-inner {
+  max-width: var(--caption-max-width);
+  width: 100%;
+  margin: 0 auto;
+  padding: 0 20px;
+  box-sizing: border-box;
+}
+
+@media screen and (max-width: 740px) {
+  #shopify-section-{{ section.id }} {
+    --h2-size:  calc({{ heading_size }}px - ({{ heading_size }}px * 0.15));
+    --font-size:  calc({{ subheading_size }}px - ({{ subheading_size }}px * 0.15));
+    --button-size: calc({{ button_size }}px - ({{ button_size }}px * 0.15));
+    --heading-image-width: calc({{ heading_image_width }}px * 0.7);
+    --caption-max-width: calc({{ caption_max_width }}px * 0.9);
+  }
+  
+  #shopify-section-{{ section.id }} .caption-inner {
+    padding: 0 15px;
+  }
+}
+
+/* Fullscreen video container */
+#shopify-section-{{ section.id }} .background--video__section {
+  min-height: 100dvh;
+  height: 100dvh;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Fallback pour navigateurs plus anciens */
+@supports not (height: 100dvh) {
+  #shopify-section-{{ section.id }} .background--video__section {
+    min-height: calc(100vh - var(--header-height, 0px));
+    height: calc(100vh - var(--header-height, 0px));
+  }
+}
+
+#shopify-section-{{ section.id }} .background-video {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Video wrapper for object-fit support */
+#shopify-section-{{ section.id }} .videoWrapper {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  min-width: 100%;
+  min-height: 100%;
+  width: auto;
+  height: auto;
+}
+
+#shopify-section-{{ section.id }} .videoWrapper video {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  min-width: 100%;
+  min-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: cover;
+}
+
+/* YouTube and Vimeo iframe styling */
+#shopify-section-{{ section.id }} .item {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+#shopify-section-{{ section.id }} .item iframe {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100vw;
+  height: 56.25vw; /* 16:9 aspect ratio */
+  min-height: 100vh;
+  min-width: 177.77vh; /* 16:9 aspect ratio */
+  pointer-events: none;
+}
+
+@media screen and (max-width: 740px) {
+  #shopify-section-{{ section.id }} {
+    --h2-size:  calc({{ heading_size }}px - ({{ heading_size }}px * 0.15));
+    --font-size:  calc({{ subheading_size }}px - ({{ subheading_size }}px * 0.15));
+  }
+}
+
+.background--video__section .caption-{{ section.id }} {
+  position: absolute;
+  z-index: 10;
+  top: {{ section.settings.video_range_vertical_position }}%;
+  left: {{ section.settings.video_range_horizontal_position }}%;
+  -webkit-transform: translate(-{{ section.settings.video_range_horizontal_position }}%, -{{ section.settings.video_range_vertical_position }}%);
+  -ms-transform: translate(-{{ section.settings.video_range_horizontal_position }}%, -{{ section.settings.video_range_vertical_position }}%);
+  -moz-transform: translate(-{{ section.settings.video_range_horizontal_position }}%, -{{ section.settings.video_range_vertical_position }}%);
+  -o-transform: translate(-{{ section.settings.video_range_horizontal_position }}%, -{{ section.settings.video_range_vertical_position }}%);
+  transform: translate(-{{ section.settings.video_range_horizontal_position }}%, -{{ section.settings.video_range_vertical_position }}%);
+}
+{% endstyle %}
+
+<div class="global__section {{ section_padding }}">
+  <section
+    class="global__section-{{ section.id }} background--video__section{% if settings.animation != 'none' %} animate {{ settings.animation }}{% endif %}"
+    data-section-id="{{ section.id }}"
+    data-section-loaded="false"
+    data-section-type="background-video">
+      {% capture caption %}
+        <div class="caption caption-{{ section.id }} {{ align_text }}">
+          <div class="caption-inner">
+            {% if has_heading_image %}
+              <img 
+                class="heading-image" 
+                src="{{ section.settings.heading_image | image_url: width: 1000 }}" 
+                alt="{{ section.settings.heading_image.alt | default: 'Heading' }}"
+                loading="lazy"
+              >
+            {% elsif has_heading %}
+              <h2>
+                {{ heading }}
+              </h2>
+            {% endif %}
+            {% if has_subheading %}
+              <p>
+                {{ subheading }}
+              </p>
+            {% endif %}
+            {% if has_button %}
+              <div class="video--button_wrapper">
+                <a class="button" href="{{ link }}">
+                  {{ button_text }}
+                </a>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      {% endcapture %}
+      <div class="background-video background-video-{{ section.id }}" data-video-type="{{ section.settings.video_url.type }}" data-video-mute="{{ section.settings.video_audio }}">
+        
+        <!-- Dark overlay filter -->
+        <div class="video-overlay"></div>        {% if section.settings.video_url == blank and section.settings.video == blank %}
+          <div class="item youtube" data-video-type="youtube">
+            <iframe allowfullscreen id="youtube-{{ section.id }}" title="{{ section.settings.description | escape }}" class="embed-player slide-media" frameborder="0" src="//www.youtube.com/embed/_9VUPq3SxOc?rel=0&showinfo=0&vq=720?controls=0&showinfo=0&autohide=1&autoplay=1&mute=1"></iframe>
+          </div>
+        {% endif %}
+
+        {% if section.settings.video != blank %}
+          <div class="videoWrapper">
+              {{ section.settings.video | video_tag: image_size: '2000x', controls: false, muted: audio, autoplay: true, loop: true, playsinline: true, preload: 'metadata', class: 'section-video js-video', title: section.settings.description }}
+          </div>
+        {% else %}
+
+          {% if section.settings.video_url.type == 'youtube' %}
+            {%- liquid
+
+            if section.settings.video_audio == 'off'
+              assign video_url = "?controls=0&showinfo=0&autohide=1&autoplay=1&mute=1"
+            else
+              assign video_url = "?controls=0&showinfo=0&autohide=1&autoplay=1"
+            endif
+
+            -%}
+              <div class="item youtube" data-video-type="youtube">
+                <iframe allowfullscreen id="youtube-{{ section.id }}" title="{{ section.settings.description | escape }}" class="embed-player slide-media" frameborder="0" src="//www.youtube.com/embed/{{ section.settings.video_url.id }}{{ video_url }}"></iframe>
+              </div>
+
+          {% elsif section.settings.video_url.type == 'vimeo' %}
+
+            {% if section.settings.video_audio == 'off' %}
+              {% assign video_url = "?api=1&byline=0&portrait=0&title=0&sidedock=0&loop=1&autoplay=1&id=217885864?&showinfo=0&controls=0&muted=1" %}
+            {% else %}
+              {% assign video_url = "?api=1&byline=0&portrait=0&title=0&sidedock=0&loop=1&autoplay=1&id=217885864?&showinfo=0&controls=0" %}
+            {% endif %}
+            <div class="item vimeo" data-video-start="4" data-video-type="vimeo">
+                <iframe allowfullscreen title="{{ section.settings.description | escape }}" class="embed-player slide-media" frameborder="0" mozallowfullscreen src="//player.vimeo.com/video/{{ section.settings.video_url.id }}{{ video_url }}" webkitallowfullscreen></iframe>
+            </div>
+
+          {% endif %}
+
+        {% endif  %}
+
+        {% if has_caption %}
+          {{ caption }}
+        {% endif %}
+      </div>
+  </section>
+</div>
+{% schema %}
+{
+  "name": "Background video",
+  "settings":
+  [
+    {
+      "type": "video",
+      "id": "video",
+      "label": "A Shopify-hosted video"
+    },
+    {
+      "id": "video_url",
+      "type": "video_url",
+      "label": "Or add a video URL",
+      "accept":
+      [
+        "youtube",
+        "vimeo"
+      ],
+      "default": "https://www.youtube.com/watch?v=_9VUPq3SxOc"
+    },
+    {
+      "type": "select",
+      "id": "video_audio",
+      "label": "Video audio",
+      "default": "off",
+      "options":
+      [
+        {
+          "value": "off",
+          "label": "Off"
+        },
+        {
+          "value": "on",
+          "label": "On"
+        }
+      ]
+    },
+    {
+      "type": "image_picker",
+      "id": "poster",
+      "label": "Placeholder Image for Video"
+    },
+    {
+      "type": "header",
+      "content": "Caption Text"
+    },
+    {
+      "type": "text",
+      "id": "video_heading",
+      "label": "Heading",
+      "default": "Video heading"
+    },
+    {
+      "type": "image_picker",
+      "id": "heading_image",
+      "label": "Or use an image as heading",
+      "info": "Image will be used instead of text heading if provided"
+    },
+    {
+      "type": "range",
+      "id": "heading_image_width",
+      "min": 100,
+      "max": 800,
+      "step": 10,
+      "unit": "px",
+      "label": "Heading image width",
+      "default": 400,
+      "info": "Only applies if heading image is selected"
+    },
+    {
+      "type": "text",
+      "id": "video_subheading",
+      "label": "Subheading",
+      "default": "Video subheading"
+    },
+    {
+      "type": "url",
+      "id": "video_button_link",
+      "label": "Link",
+      "info": "Add a link to the button",
+      "default":"/"
+    },
+    {
+      "type": "text",
+      "id": "video_button_text",
+      "label": "Button text",
+      "default": "Button",
+      "info": "Visible only if a link is chosen"
+    },
+    {
+      "type": "header",
+      "content": "Caption appearance"
+    },
+    {
+      "type": "range",
+      "id": "video_range_horizontal_position",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "%",
+      "label": "Caption horizontal position",
+      "default": 50
+    },
+    {
+      "type": "range",
+      "id": "video_range_vertical_position",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "%",
+      "label": "Caption vertical position",
+      "default": 50
+    },
+    {
+      "type": "text_alignment",
+      "id": "video_caption_alignment",
+      "label": "Caption text alignment",
+      "default": "center"
+    },
+    {
+      "type": "range",
+      "id": "caption_max_width",
+      "min": 400,
+      "max": 1400,
+      "step": 50,
+      "unit": "px",
+      "label": "Caption maximum width",
+      "default": 800,
+      "info": "Controls how wide the caption content can be"
+    },
+    {
+      "type": "range",
+      "id": "slide_heading_size",
+      "min": 13,
+      "max": 72,
+      "step": 1,
+      "unit": "px",
+      "label": "Heading size",
+      "default": 40
+    },
+    {
+      "type": "range",
+      "id": "subheading_size",
+      "min": 13,
+      "max": 36,
+      "step": 1,
+      "unit": "px",
+      "label": "Subheading size",
+      "default": 16
+    },
+    {
+      "type": "range",
+      "id": "button_size",
+      "min": 12,
+      "max": 28,
+      "step": 1,
+      "unit": "px",
+      "label": "Button text size",
+      "default": 16
+    },
+    {
+      "type": "color",
+      "id": "video_slide_text_color",
+      "label": "Heading and subheading color",
+      "default": "#000000"
+    },
+    {
+      "type": "color",
+      "id": "video_cta_color",
+      "label": "Button text",
+      "default": "#ffffff"
+    },
+    {
+      "type": "color",
+      "id": "video_cta_background",
+      "label": "Button background",
+      "default": "#000000"
+    },
+    {
+      "type": "color",
+      "id": "video_caption_background",
+      "label": "Caption background color",
+      "default": "#FFFFFF"
+    },
+    {
+      "type": "header",
+      "content": "Video filter"
+    },
+    {
+      "type": "range",
+      "id": "video_filter_opacity",
+      "min": 0,
+      "max": 80,
+      "step": 5,
+      "unit": "%",
+      "label": "Dark overlay intensity",
+      "default": 0,
+      "info": "Adds a dark filter over the video to improve text readability"
+    },
+    {
+      "type": "select",
+      "id": "section_padding",
+      "label": "Section spacing",
+      "options": [
+        {
+          "value": "top",
+          "label": "Top"
+        },
+        {
+          "value": "bottom",
+          "label": "Bottom"
+        },
+        {
+          "value": "both",
+          "label": "Both"
+        },
+        {
+          "value": "none",
+          "label": "None"
+        }
+      ],
+      "default": "both"
+    },
+    {
+      "type": "checkbox",
+      "id": "compensate_header",
+      "label": "Adjust height for header/announcement bar",
+      "info": "Automatically calculates and adjusts video height to account for header and announcement bar",
+      "default": true
+    }
+  ],
+  "presets":
+  [
+    {
+      "name": "Background video ZAB04"
+    }
+  ],
+  "disabled_on": {
+    "groups":
+    [
+      "header",
+      "footer",
+      "aside"
+    ]
+  }
+}
+{% endschema %}
+
+<script>
+  (function() {
+    const compensateHeader = {{ section.settings.compensate_header | default: true }};
+    
+    if (!compensateHeader) return;
+    
+    // Fonction pour calculer et définir la hauteur du header
+    function setHeaderHeight() {
+      // Cibler les éléments spécifiques du thème Vantage
+      const topBar = document.querySelector('.js-top-bar, #top-bar');
+      const headerSection = document.querySelector('.header-section, .header__wrapper');
+      const mobileHeader = document.querySelector('.header__mobile-container');
+      
+      let totalHeight = 0;
+      
+      // Ajouter la hauteur de la barre d'annonce si elle existe et est visible
+      if (topBar && window.getComputedStyle(topBar).display !== 'none') {
+        totalHeight += topBar.offsetHeight;
+      }
+      
+      // Ajouter la hauteur du header desktop si visible
+      if (headerSection && window.getComputedStyle(headerSection).display !== 'none') {
+        const headerWrapper = headerSection.querySelector('#header-wrapper');
+        if (headerWrapper && window.getComputedStyle(headerWrapper).display !== 'none') {
+          totalHeight += headerWrapper.offsetHeight;
+        }
+      }
+      
+      // Ajouter la hauteur du header mobile si visible
+      if (mobileHeader && window.getComputedStyle(mobileHeader).display !== 'none') {
+        totalHeight += mobileHeader.offsetHeight;
+      }
+      
+      console.log('Total header height calculated:', totalHeight + 'px');
+      
+      // Appliquer la variable CSS
+      document.documentElement.style.setProperty('--header-height', totalHeight + 'px');
+      
+      // Appliquer directement à la section vidéo
+      const videoSection = document.querySelector('#shopify-section-{{ section.id }} .background--video__section');
+      if (videoSection) {
+        const newHeight = `calc(100vh - ${totalHeight}px)`;
+        videoSection.style.height = newHeight;
+        videoSection.style.minHeight = newHeight;
+        console.log('Video section height set to:', newHeight);
+      }
+    }
+    
+    // Exécuter au chargement avec un délai pour s'assurer que tout est rendu
+    function initHeaderHeight() {
+      // Premier calcul immédiat
+      setHeaderHeight();
+      
+      // Deuxième calcul après un court délai (pour les éléments qui se chargent)
+      setTimeout(setHeaderHeight, 100);
+      setTimeout(setHeaderHeight, 300);
+      setTimeout(setHeaderHeight, 500);
+    }
+    
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initHeaderHeight);
+    } else {
+      initHeaderHeight();
+    }
+    
+    // Réexécuter au redimensionnement de la fenêtre
+    let resizeTimer;
+    window.addEventListener('resize', function() {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(setHeaderHeight, 100);
+    });
+    
+    // Observer les changements dans le header et la barre d'annonce
+    if ('MutationObserver' in window) {
+      setTimeout(function() {
+        const observer = new MutationObserver(function(mutations) {
+          // Vérifier si les changements affectent la visibilité ou la taille
+          let shouldRecalculate = false;
+          mutations.forEach(function(mutation) {
+            if (mutation.type === 'attributes' && 
+                (mutation.attributeName === 'class' || 
+                 mutation.attributeName === 'style')) {
+              shouldRecalculate = true;
+            }
+          });
+          if (shouldRecalculate) {
+            setHeaderHeight();
+          }
+        });
+        
+        const topBar = document.querySelector('.js-top-bar, #top-bar');
+        const headerSection = document.querySelector('.header-section');
+        
+        if (topBar) {
+          observer.observe(topBar, {
+            attributes: true,
+            attributeFilter: ['class', 'style']
+          });
+        }
+        
+        if (headerSection) {
+          observer.observe(headerSection, {
+            attributes: true,
+            attributeFilter: ['class', 'style'],
+            subtree: true
+          });
+        }
+      }, 500);
+    }
+    
+    // Recalculer après les transitions sticky
+    document.addEventListener('transitionend', function(e) {
+      if (e.target.classList && 
+          (e.target.classList.contains('stickynav') || 
+           e.target.classList.contains('js-top-bar'))) {
+        setTimeout(setHeaderHeight, 50);
+      }
+    });
+  })();
+</script>
