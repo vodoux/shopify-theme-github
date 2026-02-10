@@ -1,5 +1,5 @@
 {% comment %}
-  ASCII Logo Section with Hover Glitch Effect
+  ASCII Logo Section with Hover Glitch Effect (Optimized)
 
   INSTALLATION:
   1. Admin Shopify → Boutique en ligne → Thèmes → Modifier le code
@@ -31,7 +31,7 @@
     cursor: crosshair;
   }
 
-  .ascii-logo-container-{{ section.id }} .ascii-line {
+  .ascii-logo-container-{{ section.id }} .al {
     white-space: pre;
     font-size: {{ section.settings.font_size }}px;
     line-height: 1.15;
@@ -43,7 +43,7 @@
     padding: 0;
   }
 
-  .ascii-logo-container-{{ section.id }} .ascii-line .char {
+  .ascii-logo-container-{{ section.id }} .al span {
     display: inline;
     cursor: crosshair;
   }
@@ -63,11 +63,6 @@
 <div class="ascii-logo-section-{{ section.id }}">
   <div class="ascii-logo-container-{{ section.id }}" id="ascii-logo-{{ section.id }}"></div>
 </div>
-
-{% comment %} ═══════════════════════════════════════════════════════════
-  VOTRE ASCII ART CI-DESSOUS — Ne modifiez pas l'indentation!
-  Pour changer le logo, remplacez le contenu entre <pre> et </pre>
-═══════════════════════════════════════════════════════════ {% endcomment %}
 
 <pre id="ascii-raw-{{ section.id }}">
                                                         ..-==++**##%%%%%%%%%%%%%%%%%%%%##***+==-:.                                                        
@@ -127,94 +122,181 @@
   var container = document.getElementById('ascii-logo-{{ section.id }}');
   if (!rawEl || !container) return;
 
-  var ASCII_ART = rawEl.textContent;
-  if (ASCII_ART.charAt(0) === '\n') ASCII_ART = ASCII_ART.substring(1);
-  if (ASCII_ART.charAt(ASCII_ART.length - 1) === '\n') ASCII_ART = ASCII_ART.substring(0, ASCII_ART.length - 1);
+  var text = rawEl.textContent;
+  if (text.charAt(0) === '\n') text = text.substring(1);
+  if (text.charAt(text.length - 1) === '\n') text = text.substring(0, text.length - 1);
 
-  var GLITCH_CHARS = '\u2591\u2592\u2593\u2588\u2584\u2580\u25A0\u25A1\u25AA\u25AB\u25AC\u25B2\u25BA\u25BC\u25C4\u25CA\u25CB\u25CF\u25D8\u25D9\u263A\u263B\u2660\u2663\u2665\u2666';
-  var HOVER_RADIUS = {{ section.settings.hover_radius }};
-  var FONT_SIZE = {{ section.settings.font_size }};
-  var CHAR_W = FONT_SIZE * 0.664;
-  var CHAR_H = FONT_SIZE * 1.15;
+  var GLITCH = '\u2591\u2592\u2593\u2588\u2584\u2580\u25A0\u25A1\u25AA\u25AB\u25AC\u25B2\u25BA\u25BC\u25C4\u25CA\u25CB\u25CF\u25D8\u25D9\u263A\u263B\u2660\u2663\u2665\u2666';
+  var HR = {{ section.settings.hover_radius }};
+  var FS = {{ section.settings.font_size }};
+  var CW = FS * 0.664;
+  var CH = FS * 1.15;
 
-  var lines = ASCII_ART.split('\n');
-  var charGrid = [];
-  var contentChars = [];
+  var allLines = text.split('\n');
 
-  lines.forEach(function(line, row) {
-    var lineEl = document.createElement('div');
-    lineEl.className = 'ascii-line';
-    var rowChars = [];
+  // Strip leading/trailing empty lines
+  var firstContent = 0, lastContent = allLines.length - 1;
+  while (firstContent < allLines.length && !allLines[firstContent].trim()) firstContent++;
+  while (lastContent > firstContent && !allLines[lastContent].trim()) lastContent--;
+  var lines = allLines.slice(firstContent, lastContent + 1);
 
-    for (var i = 0; i < line.length; i++) {
-      var span = document.createElement('span');
-      span.textContent = line[i];
-      span.className = 'char';
-      lineEl.appendChild(span);
+  // Spatial grid: only store content chars with spans
+  // Spaces become plain text nodes (no span, no event overhead)
+  var contentChars = []; // {el, row, col, original}
+  var dirty = [];        // chars currently glitched, for batch restore
+  var lineCount = lines.length;
 
-      var entry = { el: span, row: row, col: i, original: line[i], isContent: line[i].trim() !== '' };
-      rowChars.push(entry);
-      if (entry.isContent) contentChars.push(entry);
+  // Build a spatial hash for fast lookup: grid cells of 8x8 chars
+  var CELL = 8;
+  var gridCols, gridRows, spatialGrid;
+
+  function buildDOM() {
+    var frag = document.createDocumentFragment();
+    var maxCols = 0;
+
+    for (var r = 0; r < lineCount; r++) {
+      var line = lines[r];
+      if (line.length > maxCols) maxCols = line.length;
+
+      var lineEl = document.createElement('div');
+      lineEl.className = 'al';
+
+      // Group consecutive spaces into single text nodes
+      var i = 0;
+      while (i < line.length) {
+        if (line[i].trim() === '') {
+          // Collect consecutive spaces
+          var start = i;
+          while (i < line.length && line[i].trim() === '') i++;
+          lineEl.appendChild(document.createTextNode(line.substring(start, i)));
+        } else {
+          // Content char → span
+          var span = document.createElement('span');
+          span.textContent = line[i];
+          lineEl.appendChild(span);
+
+          var entry = { el: span, row: r, col: i, original: line[i], restoreAt: 0 };
+          contentChars.push(entry);
+          i++;
+        }
+      }
+
+      frag.appendChild(lineEl);
     }
 
-    container.appendChild(lineEl);
-    charGrid.push(rowChars);
-  });
+    container.appendChild(frag);
+
+    // Build spatial grid
+    gridCols = Math.ceil(maxCols / CELL);
+    gridRows = Math.ceil(lineCount / CELL);
+    spatialGrid = new Array(gridRows * gridCols);
+    for (var g = 0; g < spatialGrid.length; g++) spatialGrid[g] = [];
+
+    for (var c = 0; c < contentChars.length; c++) {
+      var ch = contentChars[c];
+      var gi = Math.floor(ch.row / CELL) * gridCols + Math.floor(ch.col / CELL);
+      spatialGrid[gi].push(ch);
+    }
+  }
+
+  buildDOM();
+
+  // ─── Hover Glitch (throttled with rAF) ───
 
   var isHovering = false;
+  var pendingMove = null;
+  var rafId = 0;
+  var now = 0;
+
+  function processMove() {
+    rafId = 0;
+    if (!pendingMove) return;
+
+    var e = pendingMove;
+    pendingMove = null;
+    now = performance.now();
+
+    var rect = container.getBoundingClientRect();
+    var col = (e.clientX - rect.left) / CW;
+    var row = (e.clientY - rect.top) / CH;
+
+    // Only check spatial grid cells within hover radius
+    var cellR1 = Math.max(0, Math.floor((row - HR) / CELL));
+    var cellR2 = Math.min(gridRows - 1, Math.floor((row + HR) / CELL));
+    var cellC1 = Math.max(0, Math.floor((col - HR) / CELL));
+    var cellC2 = Math.min(gridCols - 1, Math.floor((col + HR) / CELL));
+
+    for (var cr = cellR1; cr <= cellR2; cr++) {
+      for (var cc = cellC1; cc <= cellC2; cc++) {
+        var bucket = spatialGrid[cr * gridCols + cc];
+        for (var b = 0; b < bucket.length; b++) {
+          var c = bucket[b];
+          var dx = c.col - col;
+          var dy = c.row - row;
+          var dist = Math.sqrt(dx * dx + dy * dy);
+
+          if (dist < HR) {
+            var intensity = 1 - (dist / HR);
+
+            if (Math.random() < intensity * 0.6) {
+              c.el.textContent = GLITCH[Math.floor(Math.random() * GLITCH.length)];
+              var br = Math.floor(150 + intensity * 105);
+              c.el.style.color = 'rgb(' + br + ',' + br + ',' + br + ')';
+              // Schedule restore 80-280ms from now
+              c.restoreAt = now + 80 + Math.random() * 200;
+              if (dirty.indexOf(c) === -1) dirty.push(c);
+            }
+          }
+        }
+      }
+    }
+
+    // Restore expired dirty chars
+    restoreDirty();
+  }
+
+  function restoreDirty() {
+    var stillDirty = [];
+    for (var i = 0; i < dirty.length; i++) {
+      var c = dirty[i];
+      if (now >= c.restoreAt) {
+        c.el.textContent = c.original;
+        c.el.style.color = '';
+      } else {
+        stillDirty.push(c);
+      }
+    }
+    dirty = stillDirty;
+
+    // Keep ticking if there are still dirty chars
+    if (dirty.length > 0 && !rafId) {
+      rafId = requestAnimationFrame(function() {
+        rafId = 0;
+        now = performance.now();
+        restoreDirty();
+      });
+    }
+  }
 
   container.addEventListener('mousemove', function(e) {
     isHovering = true;
-
-    var rect = container.getBoundingClientRect();
-    var col = (e.clientX - rect.left) / CHAR_W;
-    var row = (e.clientY - rect.top) / CHAR_H;
-
-    var rowStart = Math.max(0, Math.floor(row) - HOVER_RADIUS);
-    var rowEnd = Math.min(charGrid.length - 1, Math.floor(row) + HOVER_RADIUS);
-
-    for (var r = rowStart; r <= rowEnd; r++) {
-      var rChars = charGrid[r];
-      var colStart = Math.max(0, Math.floor(col) - HOVER_RADIUS);
-      var colEnd = Math.min(rChars.length - 1, Math.floor(col) + HOVER_RADIUS);
-
-      for (var ci = colStart; ci <= colEnd; ci++) {
-        var c = rChars[ci];
-        if (!c.isContent) continue;
-
-        var dx = ci - col;
-        var dy = r - row;
-        var dist = Math.sqrt(dx * dx + dy * dy);
-
-        if (dist < HOVER_RADIUS) {
-          var intensity = 1 - (dist / HOVER_RADIUS);
-
-          if (Math.random() < intensity * 0.6) {
-            c.el.textContent = GLITCH_CHARS[Math.floor(Math.random() * GLITCH_CHARS.length)];
-            var brightness = Math.floor(150 + intensity * 105);
-            c.el.style.color = 'rgb(' + brightness + ',' + brightness + ',' + brightness + ')';
-          }
-
-          clearTimeout(c.el._rt);
-          c.el._rt = setTimeout((function(ch) {
-            return function() {
-              ch.el.textContent = ch.original;
-              ch.el.style.color = '';
-            };
-          })(c), 80 + Math.random() * 200);
-        }
-      }
+    pendingMove = e;
+    if (!rafId) {
+      rafId = requestAnimationFrame(processMove);
     }
   });
 
   container.addEventListener('mouseleave', function() {
     isHovering = false;
+    pendingMove = null;
+    // Restore all after a short delay
     setTimeout(function() {
       if (!isHovering) {
-        contentChars.forEach(function(c) {
-          c.el.textContent = c.original;
-          c.el.style.color = '';
-        });
+        for (var i = 0; i < dirty.length; i++) {
+          dirty[i].el.textContent = dirty[i].original;
+          dirty[i].el.style.color = '';
+        }
+        dirty = [];
       }
     }, 300);
   });
