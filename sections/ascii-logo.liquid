@@ -1,0 +1,236 @@
+{% comment %}
+  ASCII Logo Section with Hover Glitch Effect
+  
+  INSTALLATION:
+  1. Dans votre admin Shopify, allez à Boutique en ligne > Thèmes > Actions > Modifier le code
+  2. Dans le dossier "Sections", cliquez "Ajouter une nouvelle section"
+  3. Nommez-la "ascii-logo" et collez tout ce code
+  4. Sauvegardez
+  5. Allez dans l'éditeur de thème (Personnaliser), et ajoutez la section "ASCII Logo" à votre page
+{% endcomment %}
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+
+  .ascii-logo-section {
+    background: {{ section.settings.bg_color }};
+    padding: {{ section.settings.padding_top }}px 0 {{ section.settings.padding_bottom }}px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .ascii-logo-container {
+    position: relative;
+    cursor: crosshair;
+  }
+
+  .ascii-logo-container .ascii-line {
+    white-space: pre;
+    font-size: {{ section.settings.font_size }}px;
+    line-height: 1.15;
+    letter-spacing: 0.02em;
+    font-family: 'JetBrains Mono', monospace;
+    color: {{ section.settings.text_color }};
+    display: block;
+    margin: 0;
+    padding: 0;
+  }
+
+  .ascii-logo-container .ascii-line .char {
+    display: inline;
+    cursor: crosshair;
+  }
+
+  @media screen and (max-width: 768px) {
+    .ascii-logo-container {
+      transform: scale({{ section.settings.mobile_scale }});
+      transform-origin: center center;
+    }
+  }
+</style>
+
+<div class="ascii-logo-section" id="ascii-logo-section-{{ section.id }}">
+  <div class="ascii-logo-container" id="ascii-logo-{{ section.id }}"></div>
+</div>
+
+<script>
+(function() {
+  const ASCII_ART = {{ section.settings.ascii_art | json }};
+  const GLITCH_CHARS = '░▒▓█▄▀■□▪▫▬▲►▼◄◊○●◘◙☺☻♠♣♥♦';
+  const HOVER_RADIUS = {{ section.settings.hover_radius }};
+
+  const container = document.getElementById('ascii-logo-{{ section.id }}');
+  if (!container || !ASCII_ART) return;
+
+  const lines = ASCII_ART.split('\n');
+  const charGrid = [];
+  const contentChars = [];
+
+  const CHAR_W = {{ section.settings.font_size }} * 0.664;
+  const CHAR_H = {{ section.settings.font_size }} * 1.15;
+
+  // Build DOM
+  lines.forEach(function(line, row) {
+    const lineEl = document.createElement('div');
+    lineEl.className = 'ascii-line';
+    const rowChars = [];
+
+    for (let i = 0; i < line.length; i++) {
+      const span = document.createElement('span');
+      span.textContent = line[i];
+      span.className = 'char';
+      lineEl.appendChild(span);
+
+      const entry = { el: span, row: row, col: i, original: line[i], isContent: line[i].trim() !== '' };
+      rowChars.push(entry);
+      if (entry.isContent) contentChars.push(entry);
+    }
+
+    container.appendChild(lineEl);
+    charGrid.push(rowChars);
+  });
+
+  // Hover Glitch Effect
+  let isHovering = false;
+
+  container.addEventListener('mousemove', function(e) {
+    isHovering = true;
+
+    const rect = container.getBoundingClientRect();
+    const col = (e.clientX - rect.left) / CHAR_W;
+    const row = (e.clientY - rect.top) / CHAR_H;
+
+    const rowStart = Math.max(0, Math.floor(row) - HOVER_RADIUS);
+    const rowEnd = Math.min(charGrid.length - 1, Math.floor(row) + HOVER_RADIUS);
+
+    for (let r = rowStart; r <= rowEnd; r++) {
+      const rowChars = charGrid[r];
+      const colStart = Math.max(0, Math.floor(col) - HOVER_RADIUS);
+      const colEnd = Math.min(rowChars.length - 1, Math.floor(col) + HOVER_RADIUS);
+
+      for (let ci = colStart; ci <= colEnd; ci++) {
+        const c = rowChars[ci];
+        if (!c.isContent) continue;
+
+        const dx = ci - col;
+        const dy = r - row;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist < HOVER_RADIUS) {
+          const intensity = 1 - (dist / HOVER_RADIUS);
+
+          if (Math.random() < intensity * 0.6) {
+            c.el.textContent = GLITCH_CHARS[Math.floor(Math.random() * GLITCH_CHARS.length)];
+            const brightness = Math.floor(150 + intensity * 105);
+            c.el.style.color = 'rgb(' + brightness + ',' + brightness + ',' + brightness + ')';
+          }
+
+          clearTimeout(c.el._restoreTimeout);
+          c.el._restoreTimeout = setTimeout(function() {
+            c.el.textContent = c.original;
+            c.el.style.color = '';
+          }, 80 + Math.random() * 200);
+        }
+      }
+    }
+  });
+
+  container.addEventListener('mouseleave', function() {
+    isHovering = false;
+
+    setTimeout(function() {
+      if (!isHovering) {
+        contentChars.forEach(function(c) {
+          c.el.textContent = c.original;
+          c.el.style.color = '';
+        });
+      }
+    }, 300);
+  });
+})();
+</script>
+
+{% schema %}
+{
+  "name": "ASCII Logo",
+  "tag": "section",
+  "class": "ascii-logo-wrapper",
+  "settings": [
+    {
+      "type": "textarea",
+      "id": "ascii_art",
+      "label": "ASCII Art",
+      "info": "Collez votre ASCII art ici. Chaque ligne sera affichée telle quelle.",
+      "default": "..-==++**##%%%%%%%%%%%%%%%%%%%%##***+==-:."
+    },
+    {
+      "type": "range",
+      "id": "font_size",
+      "label": "Taille des caractères",
+      "min": 3,
+      "max": 12,
+      "step": 0.5,
+      "default": 6,
+      "unit": "px"
+    },
+    {
+      "type": "range",
+      "id": "hover_radius",
+      "label": "Rayon de l'effet hover",
+      "min": 3,
+      "max": 20,
+      "step": 1,
+      "default": 8
+    },
+    {
+      "type": "color",
+      "id": "bg_color",
+      "label": "Couleur de fond",
+      "default": "#0a0a0a"
+    },
+    {
+      "type": "color",
+      "id": "text_color",
+      "label": "Couleur du texte",
+      "default": "#e8e8e8"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "Espacement haut",
+      "min": 0,
+      "max": 200,
+      "step": 10,
+      "default": 60,
+      "unit": "px"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "Espacement bas",
+      "min": 0,
+      "max": 200,
+      "step": 10,
+      "default": 60,
+      "unit": "px"
+    },
+    {
+      "type": "range",
+      "id": "mobile_scale",
+      "label": "Échelle mobile",
+      "min": 0.2,
+      "max": 1,
+      "step": 0.05,
+      "default": 0.45
+    }
+  ],
+  "presets": [
+    {
+      "name": "ASCII Logo"
+    }
+  ]
+}
+{% endschema %}
